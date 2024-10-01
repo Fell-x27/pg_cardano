@@ -1,0 +1,6 @@
+comment = 'pg_cardano:  Created by pgrx'
+default_version = '@CARGO_VERSION@'
+module_pathname = '$libdir/pg_cardano'
+relocatable = false
+superuser = true
+trusted = false
