@@ -100,8 +100,25 @@ mod cardano {
         verifying_key.verify(message, &signature).is_ok()
     }
 
-    mod cardano {
+    pub mod tools {
         use super::*;
+        pub(crate) fn drep_id_encode_cip105(raw_id_bytes:  &[u8], is_script: bool) -> String{
+            let hrp = if is_script { "drep_script" } else { "drep" };
+            bech32_encode(hrp, raw_id_bytes)
+        }
+
+        pub(crate) fn drep_id_encode_cip129(raw_id_bytes:  &[u8], is_script: bool)-> String{
+            //add 22[0010 0010] for keyhash;
+            //add 23[0010 0011] for script;
+            let byte_prefix = if is_script { 0x23 } else { 0x22 };
+            let hrp = "drep";
+
+            let mut input_with_prefix = Vec::with_capacity(1 + raw_id_bytes.len());  // Выделяем место для одного байта + исходные байты
+            input_with_prefix.push(byte_prefix);
+            input_with_prefix.extend_from_slice(raw_id_bytes);
+
+            bech32_encode(hrp, &input_with_prefix)
+        }
     }
 }
 
@@ -230,6 +247,42 @@ mod tests {
         let is_valid =crate::cardano::ed25519_verify_signature(public_key.clone(), message, signature.clone());
 
         assert!(is_valid);
+    }
+
+    #[pg_test]
+    fn test_drep_id_pubkey_encode_cip105(){
+        let drep_raw_id = hex::decode("28111ae17ff8fdfbd4f39cabdb2705f1c0200b8e159106f34388b155").expect("Failed to decode hex");
+        let pubkey_view_id = crate::cardano::tools::drep_id_encode_cip105(&drep_raw_id, false);
+        let pubkey_view_id_expected = "drep19qg34ctllr7lh48nnj4akfc978qzqzuwzkgsdu6r3zc42e5y854";
+
+        assert_eq!(pubkey_view_id_expected,pubkey_view_id);
+    }
+
+    #[pg_test]
+    fn test_drep_id_script_encode_cip105(){
+        let drep_raw_id = hex::decode("28111ae17ff8fdfbd4f39cabdb2705f1c0200b8e159106f34388b155").expect("Failed to decode hex");
+        let script_view_id = crate::cardano::tools::drep_id_encode_cip105(&drep_raw_id, true);
+        let script_view_id_expected = "drep_script19qg34ctllr7lh48nnj4akfc978qzqzuwzkgsdu6r3zc42kke0g5";
+
+        assert_eq!(script_view_id_expected,script_view_id);
+    }
+
+    #[pg_test]
+    fn test_drep_id_pubkey_encode_cip129(){
+        let drep_raw_id = hex::decode("28111ae17ff8fdfbd4f39cabdb2705f1c0200b8e159106f34388b155").expect("Failed to decode hex");
+        let pubkey_view_id = crate::cardano::tools::drep_id_encode_cip129(&drep_raw_id, false);
+        let pubkey_view_id_expected = "drep1yg5pzxhp0lu0m7757ww2hke8qhcuqgqt3c2ezphngwytz4gjr6yge";
+
+        assert_eq!(pubkey_view_id_expected,pubkey_view_id);
+    }
+
+    #[pg_test]
+    fn test_drep_id_script_encode_cip129(){
+        let drep_raw_id = hex::decode("28111ae17ff8fdfbd4f39cabdb2705f1c0200b8e159106f34388b155").expect("Failed to decode hex");
+        let script_view_id = crate::cardano::tools::drep_id_encode_cip129(&drep_raw_id, true);
+        let script_view_id_expected = "drep1yv5pzxhp0lu0m7757ww2hke8qhcuqgqt3c2ezphngwytz4gj324g7";
+
+        assert_eq!(script_view_id_expected,script_view_id);
     }
 }
 
