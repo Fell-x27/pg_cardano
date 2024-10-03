@@ -3,7 +3,7 @@ use pgrx::prelude::*;
 #[cfg(any(test, feature = "pg_test"))]
 #[pg_schema]
 mod tests {
-    use pgrx::pg_sys::netent;
+    use std::ptr::null;
     use pgrx::prelude::*;
 
     #[pg_test]
@@ -65,7 +65,7 @@ mod tests {
 
         let expected_output = hex::decode("a3636164616b697320616d617a696e67216866656174757265738267736369656e636568617070726f6163686776657273696f6ef93c00")
             .expect("Failed to decode hex");
-        let result = crate::cardano::jsonb_to_cbor(original_json);
+        let result = crate::cardano::cbor_encode_jsonb(original_json);
 
         assert_eq!(expected_output, result);
     }
@@ -83,7 +83,7 @@ mod tests {
 
         let cbor_bytes = hex::decode("a3636164616b697320616d617a696e67216866656174757265738267736369656e636568617070726f6163686776657273696f6ef93c00")
             .expect("Failed to decode hex");
-        let result = crate::cardano::cbor_to_jsonb(&cbor_bytes);
+        let result = crate::cardano::cbor_decode_jsonb(&cbor_bytes);
 
         let expected_output = serde_json::to_string(&original_json.0).expect("Failed to serialize original_json");
         let result_str = serde_json::to_string(&result.0).expect("Failed to serialize result");
@@ -96,7 +96,7 @@ mod tests {
         let data = b"Cardano is amazing!";
         let expected_output = hex::decode("2244d5c9699fa93b0a8ed3ae952f88c9b872177e8a8ffcd8126a0d69e6806545")
             .expect("Failed to decode hex");
-        let result = crate::cardano::blake2b(data, 32);
+        let result = crate::cardano::blake2b_hash(data, 32);
 
         assert_eq!(expected_output, result);
     }
@@ -129,7 +129,7 @@ mod tests {
     #[pg_test]
     fn test_drep_id_pubkey_encode_cip105() {
         let drep_raw_id = hex::decode("28111ae17ff8fdfbd4f39cabdb2705f1c0200b8e159106f34388b155").expect("Failed to decode hex");
-        let pubkey_view_id = crate::cardano::tools::drep_id_encode_cip105(&drep_raw_id, false);
+        let pubkey_view_id = crate::cardano::tools_drep_id_encode_cip105(&drep_raw_id, false);
         let pubkey_view_id_expected = "drep19qg34ctllr7lh48nnj4akfc978qzqzuwzkgsdu6r3zc42e5y854";
 
         assert_eq!(pubkey_view_id_expected, pubkey_view_id);
@@ -138,7 +138,7 @@ mod tests {
     #[pg_test]
     fn test_drep_id_script_encode_cip105() {
         let drep_raw_id = hex::decode("28111ae17ff8fdfbd4f39cabdb2705f1c0200b8e159106f34388b155").expect("Failed to decode hex");
-        let script_view_id = crate::cardano::tools::drep_id_encode_cip105(&drep_raw_id, true);
+        let script_view_id = crate::cardano::tools_drep_id_encode_cip105(&drep_raw_id, true);
         let script_view_id_expected = "drep_script19qg34ctllr7lh48nnj4akfc978qzqzuwzkgsdu6r3zc42kke0g5";
 
         assert_eq!(script_view_id_expected, script_view_id);
@@ -147,7 +147,7 @@ mod tests {
     #[pg_test]
     fn test_drep_id_pubkey_encode_cip129() {
         let drep_raw_id = hex::decode("28111ae17ff8fdfbd4f39cabdb2705f1c0200b8e159106f34388b155").expect("Failed to decode hex");
-        let pubkey_view_id = crate::cardano::tools::drep_id_encode_cip129(&drep_raw_id, false);
+        let pubkey_view_id = crate::cardano::tools_drep_id_encode_cip129(&drep_raw_id, false);
         let pubkey_view_id_expected = "drep1yg5pzxhp0lu0m7757ww2hke8qhcuqgqt3c2ezphngwytz4gjr6yge";
 
         assert_eq!(pubkey_view_id_expected, pubkey_view_id);
@@ -156,7 +156,7 @@ mod tests {
     #[pg_test]
     fn test_drep_id_script_encode_cip129() {
         let drep_raw_id = hex::decode("28111ae17ff8fdfbd4f39cabdb2705f1c0200b8e159106f34388b155").expect("Failed to decode hex");
-        let script_view_id = crate::cardano::tools::drep_id_encode_cip129(&drep_raw_id, true);
+        let script_view_id = crate::cardano::tools_drep_id_encode_cip129(&drep_raw_id, true);
         let script_view_id_expected = "drep1yv5pzxhp0lu0m7757ww2hke8qhcuqgqt3c2ezphngwytz4gj324g7";
 
         assert_eq!(script_view_id_expected, script_view_id);
@@ -166,9 +166,8 @@ mod tests {
     fn test_build_shelley_base_address() {
         let p_cred = hex::decode("7415251fc7df0983fb1809b8b27e2d4578d8b7ca336be8656627e626").expect("Failed to decode hex");
         let s_cred = hex::decode("7c3ae2f2175c3d886b9daaa362533b7db1b30db6f2bafaed7569eeef").expect("Failed to decode hex");
-        let addr_type = 0;
         let network_id = 0;
-        let base_address = crate::cardano::tools::build_shelley_base_address(&p_cred, &s_cred, addr_type, network_id);
+        let base_address = crate::cardano::tools_shelley_address_build(&p_cred, false, &s_cred, false, network_id);
         let expected_result = "addr_test1qp6p2fglcl0snqlmrqym3vn794zh3k9hegekh6r9vcn7vfnu8t30y96u8kyxh8d25d39xwmakxesmdhjhtaw6atfamhsplwypm";
 
         assert_eq!(base_address, expected_result);
@@ -177,9 +176,9 @@ mod tests {
     #[pg_test]
     fn test_build_shelley_enterprise_address() {
         let p_cred = hex::decode("7415251fc7df0983fb1809b8b27e2d4578d8b7ca336be8656627e626").expect("Failed to decode hex");
-        let addr_type = 6;
+        let s_cred = hex::decode("").expect("Failed to decode hex");
         let network_id = 0;
-        let base_address = crate::cardano::tools::build_shelley_enterprise_address(&p_cred, addr_type, network_id);
+        let base_address = crate::cardano::tools_shelley_address_build(&p_cred, false, &s_cred, false, network_id);
         let expected_result = "addr_test1vp6p2fglcl0snqlmrqym3vn794zh3k9hegekh6r9vcn7vfspyp8fn";
 
         assert_eq!(base_address, expected_result);
@@ -187,10 +186,10 @@ mod tests {
 
     #[pg_test]
     fn test_build_shelley_reward_address() {
+        let p_cred = hex::decode("").expect("Failed to decode hex");
         let s_cred = hex::decode("7c3ae2f2175c3d886b9daaa362533b7db1b30db6f2bafaed7569eeef").expect("Failed to decode hex");
-        let addr_type = 14;
         let network_id = 0;
-        let base_address = crate::cardano::tools::build_shelley_reward_address(&s_cred, addr_type, network_id);
+        let base_address = crate::cardano::tools_shelley_address_build(&p_cred, false, &s_cred, false, network_id);
         let expected_result = "stake_test1up7r4chjzawrmzrtnk42xcjn8d7mrvcdkmet47hdw457amcl9yr85";
 
         assert_eq!(base_address, expected_result);
@@ -200,7 +199,7 @@ mod tests {
     fn test_extract_shelley_base_address_payment_cred() {
         let base_address = "addr_test1qp6p2fglcl0snqlmrqym3vn794zh3k9hegekh6r9vcn7vfnu8t30y96u8kyxh8d25d39xwmakxesmdhjhtaw6atfamhsplwypm";
         let expected_result = hex::decode("7415251fc7df0983fb1809b8b27e2d4578d8b7ca336be8656627e626").expect("Failed to decode hex");
-        let p_cred = crate::cardano::tools::extract_shelley_addr_payment_cred(&base_address);
+        let p_cred = crate::cardano::tools_shelley_addr_extract_main_cred(&base_address);
         assert_eq!(p_cred, expected_result);
     }
 
@@ -208,7 +207,7 @@ mod tests {
     fn test_extract_shelley_enterprise_address_payment_cred() {
         let enterprise_address = "addr_test1vp6p2fglcl0snqlmrqym3vn794zh3k9hegekh6r9vcn7vfspyp8fn";
         let expected_result = hex::decode("7415251fc7df0983fb1809b8b27e2d4578d8b7ca336be8656627e626").expect("Failed to decode hex");
-        let p_cred = crate::cardano::tools::extract_shelley_addr_payment_cred(&enterprise_address);
+        let p_cred = crate::cardano::tools_shelley_addr_extract_main_cred(&enterprise_address);
         assert_eq!(p_cred, expected_result);
     }
 
@@ -216,7 +215,7 @@ mod tests {
     fn test_extract_base_address_stake_cred() {
         let base_address = "addr_test1qp6p2fglcl0snqlmrqym3vn794zh3k9hegekh6r9vcn7vfnu8t30y96u8kyxh8d25d39xwmakxesmdhjhtaw6atfamhsplwypm";
         let expected_result = hex::decode("7c3ae2f2175c3d886b9daaa362533b7db1b30db6f2bafaed7569eeef").expect("Failed to decode hex");
-        let s_cred = crate::cardano::tools::extract_base_addr_stake_cred(&base_address);
+        let s_cred = crate::cardano::tools_shelley_addr_extract_additional_cred(&base_address);
         assert_eq!(s_cred, expected_result);
     }
 
@@ -224,22 +223,22 @@ mod tests {
     fn test_extract_reward_address_stake_cred() {
         let reward_address = "stake_test1up7r4chjzawrmzrtnk42xcjn8d7mrvcdkmet47hdw457amcl9yr85";
         let expected_result = hex::decode("7c3ae2f2175c3d886b9daaa362533b7db1b30db6f2bafaed7569eeef").expect("Failed to decode hex");
-        let s_cred = crate::cardano::tools::extract_reward_addr_stake_cred(&reward_address);
+        let s_cred = crate::cardano::tools_shelley_addr_extract_main_cred(&reward_address);
         assert_eq!(s_cred, expected_result);
     }
 
     #[pg_test]
     fn test_get_addr_type() {
         let reward_address = "stake_test1up7r4chjzawrmzrtnk42xcjn8d7mrvcdkmet47hdw457amcl9yr85";
-        let reward_addr_type = crate::cardano::tools::get_addr_type(&reward_address);
+        let reward_addr_type = crate::cardano::tools_shelley_addr_get_type(&reward_address);
         assert_eq!(reward_addr_type, "STK_KEY");
 
         let base_address = "addr_test1qp6p2fglcl0snqlmrqym3vn794zh3k9hegekh6r9vcn7vfnu8t30y96u8kyxh8d25d39xwmakxesmdhjhtaw6atfamhsplwypm";
-        let base_addr_type = crate::cardano::tools::get_addr_type(&base_address);
+        let base_addr_type = crate::cardano::tools_shelley_addr_get_type(&base_address);
         assert_eq!(base_addr_type, "PMT_KEY:STK_KEY");
 
         let enterprise_address = "addr_test1vp6p2fglcl0snqlmrqym3vn794zh3k9hegekh6r9vcn7vfspyp8fn";
-        let enterprise_addr_type = crate::cardano::tools::get_addr_type(&enterprise_address);
+        let enterprise_addr_type = crate::cardano::tools_shelley_addr_get_type(&enterprise_address);
         assert_eq!(enterprise_addr_type, "PMT_KEY:NONE");
     }
 }
