@@ -5,8 +5,8 @@
 3. [Installation and Usage](#installation-and-usage)
     - [1. Install Rust](#1-install-rust)
     - [2. Clone the Repository and install dependencies](#2-clone-the-repository-and-install-dependencies)
-    - [3. Build the Extension](#3-build-the-extension)
-    - [4. Check and Install the Extension](#4-check-and-install-the-extension)
+    - [3. Test the Extension](#3-test-the-extension-optional)
+    - [4. Build and Install the Extension](#4-build-and-install-the-extension)
     - [5. Create the Extension in PostgreSQL](#5-create-the-extension-in-postgresql)
     - [6. Using the Extension](#6-using-the-extension)
       - [Base58 Encoding and Decoding](#base58-encoding-and-decoding)
@@ -55,7 +55,7 @@ Ensure that Rust is installed on your system. Use the following command to insta
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 
-## 2. Clone the Repository and install dependencies
+### 2. Clone the Repository and install dependencies
 
 ```bash
 git clone https://github.com/Fell-x27/pg_cardano.git
@@ -64,27 +64,31 @@ cargo install cargo-pgrx
 cargo pgrx init
 ```
 
-## 3. Build the Extension
+By default, `pgrx` will build environments for PostgreSQL versions 12 through 17. During installation, your database version will be detected automatically. However, the build process can take a long time, so you may want to remove the unnecessary versions from `cargo.toml` and switch the default to the remaining one.
+
+Or, you can just leave it as is.
+
+## 3. Test the Extension (OPTIONAL)
 
 Inside the project directory run tests to be sure if everything is fine:
 ```bash
 cargo build && cargo test --package pg_cardano --lib tests
 ```
 
+Optionally, you can check the extension in a sandboxed PostgreSQL instance with:
+```bash
+cargo pgrx run
+#remember - you still have to activate the extension manually, see step #6
+```
+
+## 4. Build and Install the Extension
 
 Then build the extension using the following command:
 ```bash
 cargo pgrx package
 ```
 
-
-## 4. Check and Install the Extension
-
-You can check the extension in a sandboxed PostgreSQL instance with: 
-```bash
-cargo pgrx run
-#remember - you still have to activate the extension manually, see step #6
-```
+If it fails, check if PostgreSQL is installed.
 
 Or you can install it right to your database:
 ```bash
