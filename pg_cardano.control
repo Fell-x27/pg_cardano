@@ -1,4 +1,4 @@
-comment = 'pg_cardano:  Created by pgrx'
+comment = 'pg_cardano:  Created by Fel-x27'
 default_version = '@CARGO_VERSION@'
 module_pathname = '$libdir/pg_cardano'
 relocatable = false
