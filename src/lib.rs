@@ -183,8 +183,7 @@ mod cardano {
     }
 
     // Shelley Addr extractors
-    #[pg_extern]
-    pub(crate) fn tools_shelley_addr_extract_main_cred(shelley_address_bech32: &str) -> Vec<u8> {
+    pub(crate) fn helper_shelley_addr_extract_main_cred(shelley_address_bech32: &str) -> Vec<u8> {
         let raw_address = bech32_decode_data(&shelley_address_bech32);
 
         if raw_address.len() < 29 {
@@ -195,9 +194,8 @@ mod cardano {
         payment_cred
     }
 
-    #[pg_extern]
-    pub(crate) fn tools_shelley_addr_extract_additional_cred(base_address_bech32: &str) -> Vec<u8> {
-        let raw_address = bech32_decode_data(&base_address_bech32);
+    pub(crate) fn helper_shelley_addr_extract_additional_cred(shelley_address_bech32: &str) -> Vec<u8> {
+        let raw_address = bech32_decode_data(&shelley_address_bech32);
 
         if raw_address.len() != 57 {
             panic!("Invalid address length: {} . Expected 57 bytes.", raw_address.len());
@@ -206,12 +204,41 @@ mod cardano {
         let stake_cred = raw_address[29..57].to_vec();
         stake_cred
     }
+    #[pg_extern]
+    pub(crate) fn tools_shelley_addr_extract_payment_cred(shelley_address_bech32: &str) -> Vec<u8> {
+        let raw_address = bech32_decode_data(&shelley_address_bech32);
+        let addr_type_byte = raw_address[0] >> 4;
+
+        match addr_type_byte {
+            0b0000 | 0b0001 | 0b0010 | 0b0011 | 0b0100 | 0b0101 | 0b0110 | 0b0111 => {
+                helper_shelley_addr_extract_main_cred(&shelley_address_bech32)
+            }
+            0b1110 | 0b1111 => panic!("Address does not contain payment data!"),
+            _ => panic!("Invalid addr type. Expected Shelley-era address."),
+        }
+    }
+
+    #[pg_extern]
+    pub(crate) fn tools_shelley_addr_extract_stake_cred(shelley_address_bech32: &str) -> Vec<u8> {
+        let raw_address = bech32_decode_data(&shelley_address_bech32);
+        let addr_type_byte = raw_address[0] >> 4;
+
+        match addr_type_byte {
+            0b0000 | 0b0001 | 0b0010 | 0b0011 | 0b0100 | 0b0101 | 0b0110 | 0b0111 => {
+                helper_shelley_addr_extract_additional_cred(&shelley_address_bech32)
+            }
+            0b1110 | 0b1111 => {
+                helper_shelley_addr_extract_main_cred(&shelley_address_bech32)
+            }
+            _ => panic!("Invalid addr type. Expected Shelley-era address."),
+        }
+    }
 
 
     // Shelley Addr type detector
     #[pg_extern]
-    pub(crate) fn tools_shelley_addr_get_type(base_address_bech32: &str) -> String {
-        let raw_address = bech32_decode_data(&base_address_bech32);
+    pub(crate) fn tools_shelley_addr_get_type(shelley_address_bech32: &str) -> String {
+        let raw_address = bech32_decode_data(&shelley_address_bech32);
         let addr_type_byte = raw_address[0] >> 4;
 
         let addr_type = match addr_type_byte {
