@@ -1,14 +1,16 @@
 # Contents
 
 1. [About this project](#about-this-project)
-2. [Requirements](#requirements)
-3. [Installation and Usage](#installation-and-usage)
+3. [Installing Pre-built Binaries](#installing-pre-built-binaries)
+4. [Building from sources](#building-from-sources)
+    - [0. Requirements](#0-requirements)
     - [1. Install Rust](#1-install-rust)
     - [2. Clone the Repository and install dependencies](#2-clone-the-repository-and-install-dependencies)
     - [3. Test the Extension](#3-test-the-extension-optional)
     - [4. Build and Install the Extension](#4-build-and-install-the-extension)
-    - [5. Create the Extension in PostgreSQL](#5-create-the-extension-in-postgresql)
-    - [6. Using the Extension](#6-using-the-extension)
+6. [Using the Extension](#using-the-extension)
+    - [Create the Extension in PostgreSQL](#create-the-extension-in-postgresql)
+    - [Examples](#examples)
       - [Base58 Encoding and Decoding](#base58-encoding-and-decoding)
       - [Bech32 Encoding and Decoding](#bech32-encoding-and-decoding)
       - [CBOR Encoding and Decoding](#cbor-encoding-and-decoding)
@@ -27,7 +29,27 @@ The extension is designed to handle unforeseen errors gracefully, without causin
 
 This extension is developed with the support of the 💜 **Medusa Development Support [MDS]** 💜 stake pool .
 
-## Requirements
+
+# Installing Pre-built Binaries
+
+1. Download the latest version from the releases page.
+2. Unpack the `.tar.gz` archive.
+3. Navigate to the unpacked directory and run:
+    ```bash
+    ./install.sh
+    ```
+   That's it!
+4. If you want to remove the extension, run:
+    ```bash
+    ./uninstall.sh
+    ```
+   from the same directory, of course.
+
+Then jump to the [Using paragraph](#using-the-extension)!
+
+# Building from sources
+
+## 0. Requirements
 
 To use this extension, you will need the following:
 
@@ -45,8 +67,6 @@ To use this extension, you will need the following:
 
 Make sure that all required dependencies are installed before proceeding with the installation of the extension.
 
-# Installation and Usage
-
 ## 1. Install Rust
 
 Ensure that Rust is installed on your system. Use the following command to install Rust:
@@ -55,7 +75,7 @@ Ensure that Rust is installed on your system. Use the following command to insta
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 
-### 2. Clone the Repository and install dependencies
+## 2. Clone the Repository and install dependencies
 
 ```bash
 git clone https://github.com/Fell-x27/pg_cardano.git
@@ -78,8 +98,8 @@ cargo build && cargo test --package pg_cardano --lib tests
 Optionally, you can check the extension in a sandboxed PostgreSQL instance with:
 ```bash
 cargo pgrx run
-#remember - you still have to activate the extension manually, see step #5
 ```
+remember - you still have to activate the extension manually, see ["Using the Extension"](#using-the-extension)
 
 ## 4. Build and Install the Extension
 
@@ -87,15 +107,18 @@ Then build the extension using the following command:
 ```bash
 cargo pgrx package
 ```
-
 If it fails, check if PostgreSQL is installed.
 
-Or you can install it right to your database:
+Then you can install it right to your database:
 ```bash
 cargo pgrx install --no-default-features --release --sudo
 ```
 
-## 5. Create the Extension in PostgreSQL
+You are awesome!
+
+# Using the Extension
+
+## Create the Extension in PostgreSQL
 
 In order to use, you need to create it in your PostgreSQL database.
 
@@ -109,9 +132,7 @@ Then create it:
 CREATE EXTENSION IF NOT EXISTS pg_cardano;
 ```
 
-You are awesome!
-
-## 6. Using the Extension
+## Examples
 
 After creating the extension, you can use the various cryptographic and utility functions it provides. Below are examples of how to use these functions.
 

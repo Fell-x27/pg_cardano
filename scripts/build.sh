@@ -1,6 +1,7 @@
 #!/bin/bash
 
 CONFIG_FILE="$HOME/.pgrx/config.toml"
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 if [ ! -f "$CONFIG_FILE" ]; then
   echo "Configuration file not found at $CONFIG_FILE"
@@ -39,8 +40,8 @@ for PG_VERSION in "${!PG_CONFIGS[@]}"; do
   if [ -f "$PG_CONFIG" ]; then
     echo "Packaging for $PG_VERSION using $PG_CONFIG..."
 
-    OUTPUT_DIR="./target/release/pg_cardano-${PG_VERSION}"
-    BIN_DIR="./binaries/$PG_VERSION"
+    OUTPUT_DIR="$DIR/../target/release/pg_cardano-${PG_VERSION}"
+    BIN_DIR="$DIR/../binaries/$PG_VERSION"
     mkdir -p "$BIN_DIR"
 
     cargo pgrx package --pg-config "$PG_CONFIG" --out-dir "$OUTPUT_DIR" --no-default-features
@@ -60,5 +61,6 @@ for PG_VERSION in "${!PG_CONFIGS[@]}"; do
 
 done
 
-cp "./install_binaries.sh"  "./binaries/"
+cp "$DIR/install.sh" "$DIR/../binaries/"
+cp "$DIR/uninstall.sh" "$DIR/../binaries/"
 echo "Packaging completed."

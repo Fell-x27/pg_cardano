@@ -6,6 +6,8 @@ YELLOW="\e[33m"
 GREEN="\e[32m"
 BLUE="\e[34m"
 
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 get_pg_config_value() {
   local key="$1"
   pg_config | grep "$key" | cut -d '=' -f 2 | xargs
@@ -27,7 +29,7 @@ fi
 TARGET_DIR="./pg$PG_VERSION"
 
 if [ ! -d "$TARGET_DIR" ]; then
-  TARGET_DIR="./binaries/pg$PG_VERSION"
+  TARGET_DIR="$DIR/../binaries/pg$PG_VERSION"
 fi
 
 if [ ! -d "$TARGET_DIR" ]; then
