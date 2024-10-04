@@ -5,8 +5,15 @@ RESET="\e[0m"
 YELLOW="\e[33m"
 GREEN="\e[32m"
 BLUE="\e[34m"
+RED="\e[31m"
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+if ! command -v pg_config &> /dev/null; then
+  echo -e "${BOLD}${RED}Error: pg_config not found.${RESET}"
+  echo -e "${BOLD}${YELLOW}Please install the PostgreSQL development package for your system.${RESET}"
+  exit 1
+fi
 
 get_pg_config_value() {
   local key="$1"
@@ -41,6 +48,10 @@ echo -e "${BOLD}${GREEN}Found extension directory: $TARGET_DIR${RESET}"
 
 echo -e "${BOLD}${BLUE}Now copying files to system directories, this requires sudo privileges.${RESET}"
 
+sudo mkdir -p "$SHAREDIR"
+sudo mkdir -p "$SHAREDIR/extension/"
+sudo mkdir -p "$PKGLIBDIR"
+
 sudo cp "$TARGET_DIR"/*.control "$SHAREDIR/extension/" 2>/dev/null
 if [ $? -ne 0 ]; then
   echo -e "${BOLD}${RED}Error: Failed to copy control files to $SHAREDIR/extension.${RESET}"
@@ -73,4 +84,3 @@ echo -e "   ${BOLD}DROP EXTENSION pg_cardano;${RESET}"
 
 echo -e "\nFor more information, you can refer to the official documentation:"
 echo -e "   ${BLUE}https://github.com/Fell-x27/pg_cardano/blob/master/README.md${RESET}"
-
