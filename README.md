@@ -25,7 +25,7 @@ It is written in **Rust**, which ensures high security and excellent performance
 
 The extension is designed to handle unforeseen errors gracefully, without causing any disruptions in the database's operation. All errors are safely propagated as PostgreSQL-level error messages.
 
-This extension is developed with the support of the **Medusa Development Support [MDS]** stake pool .
+This extension is developed with the support of the 💜**Medusa Development Support [MDS]**💜 stake pool .
 
 ## Requirements
 
@@ -43,7 +43,7 @@ To use this extension, you will need the following:
       sudo yum makecache && sudo yum install clang clang-devel git curl bison-devel readline-devel zlib-devel openssl-devel wget ccache && sudo yum groupinstall -y 'Development Tools'
       ```
 
-Make sure that all required dependencies and are installed before proceeding with the installation of the extension.
+Make sure that all required dependencies are installed before proceeding with the installation of the extension.
 
 # Installation and Usage
 
@@ -78,7 +78,7 @@ cargo build && cargo test --package pg_cardano --lib tests
 Optionally, you can check the extension in a sandboxed PostgreSQL instance with:
 ```bash
 cargo pgrx run
-#remember - you still have to activate the extension manually, see step #6
+#remember - you still have to activate the extension manually, see step #5
 ```
 
 ## 4. Build and Install the Extension
