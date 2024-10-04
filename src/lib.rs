@@ -114,7 +114,7 @@ mod cardano {
         let byte_prefix = if is_script { 0x23 } else { 0x22 };
         let hrp = "drep";
 
-        let mut input_with_prefix = Vec::with_capacity(1 + raw_id_bytes.len());  // Выделяем место для одного байта + исходные байты
+        let mut input_with_prefix = Vec::with_capacity(1 + raw_id_bytes.len());
         input_with_prefix.push(byte_prefix);
         input_with_prefix.extend_from_slice(raw_id_bytes);
 
