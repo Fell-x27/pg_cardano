@@ -303,4 +303,16 @@ SELECT cardano.tools_shelley_addr_extract_stake_cred('addr_test1qp6p2fglcl0snqlm
 ```sql
 SELECT cardano.tools_shelley_addr_get_type('addr_test1vp6p2fglcl0snqlmrqym3vn794zh3k9hegekh6r9vcn7vfspyp8fn');  
 -- Returns 'PMT_KEY:NONE
+-- Available options:
+--         "PMT_KEY:STK_KEY",
+--         "PMT_SCRIPT:STK_KEY",
+--         "PMT_KEY:STK_SCRIPT",
+--         "PMT_SCRIPT:STK_SCRIPT",
+--         "PMT_KEY:POINTER",
+--         "PMT_SCRIPT:POINTER",
+--         "PMT_KEY:NONE",
+--         "PMT_SCRIPT:NONE"
+--         "STK_KEY"
+--         "STK_SCRIPT"
+--         "UNKNOWN"
 ```
