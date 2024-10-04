@@ -25,7 +25,7 @@ It is written in **Rust**, which ensures high security and excellent performance
 
 The extension is designed to handle unforeseen errors gracefully, without causing any disruptions in the database's operation. All errors are safely propagated as PostgreSQL-level error messages.
 
-This extension is developed with the support of the 💜**Medusa Development Support [MDS]**💜 stake pool .
+This extension is developed with the support of the 💜 **Medusa Development Support [MDS]** 💜 stake pool .
 
 ## Requirements
 
