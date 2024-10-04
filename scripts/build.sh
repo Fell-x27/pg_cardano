@@ -41,17 +41,17 @@ for PG_VERSION in "${!PG_CONFIGS[@]}"; do
     echo "Packaging for $PG_VERSION using $PG_CONFIG..."
 
     OUTPUT_DIR="$DIR/../target/release/pg_cardano-${PG_VERSION}"
-    BIN_DIR="$DIR/../binaries/$PG_VERSION"
-    mkdir -p "$BIN_DIR"
+    DISTR_DIR="$DIR/../distro/$PG_VERSION"
+    mkdir -p "$DISTR_DIR"
 
     cargo pgrx package --pg-config "$PG_CONFIG" --out-dir "$OUTPUT_DIR" --no-default-features
 
     INSTALL_DIR=$(find "$OUTPUT_DIR" -type d -name "pgrx-install")
 
     if [ -d "$INSTALL_DIR" ]; then
-      cp "$INSTALL_DIR/lib/postgresql/"* "$BIN_DIR/"
-      cp "$INSTALL_DIR/share/postgresql/extension/"* "$BIN_DIR/"
-      echo "Files successfully extracted to $BIN_DIR"
+      cp "$INSTALL_DIR/lib/postgresql/"* "$DISTR_DIR/"
+      cp "$INSTALL_DIR/share/postgresql/extension/"* "$DISTR_DIR/"
+      echo "Files successfully extracted to $DISTR_DIR"
     else
       echo "pgrx-install directory not found in $OUTPUT_DIR for $PG_VERSION"
     fi
@@ -61,6 +61,6 @@ for PG_VERSION in "${!PG_CONFIGS[@]}"; do
 
 done
 
-cp "$DIR/install.sh" "$DIR/../binaries/"
-cp "$DIR/uninstall.sh" "$DIR/../binaries/"
+cp "$DIR/install.sh" "$DIR/../distro/"
+cp "$DIR/uninstall.sh" "$DIR/../distro/"
 echo "Packaging completed."

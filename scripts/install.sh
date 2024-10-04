@@ -29,11 +29,11 @@ fi
 TARGET_DIR="./pg$PG_VERSION"
 
 if [ ! -d "$TARGET_DIR" ]; then
-  TARGET_DIR="$DIR/../binaries/pg$PG_VERSION"
+  TARGET_DIR="$DIR/../distro/pg$PG_VERSION"
 fi
 
 if [ ! -d "$TARGET_DIR" ]; then
-  echo -e "${BOLD}${RED}Error: Directory with binaries for PostgreSQL $PG_VERSION not found.${RESET}"
+  echo -e "${BOLD}${RED}Error: Directory with pre-built extension for PostgreSQL $PG_VERSION not found.${RESET}"
   exit 1
 fi
 
