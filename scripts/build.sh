@@ -41,7 +41,7 @@ for PG_VERSION in "${!PG_CONFIGS[@]}"; do
     echo "Packaging for $PG_VERSION using $PG_CONFIG..."
 
     OUTPUT_DIR="$DIR/../target/release/pg_cardano-${PG_VERSION}"
-    DISTR_DIR="$DIR/../distro/$PG_VERSION"
+    DISTR_DIR="$DIR/../pg_cardano/bin/$PG_VERSION"
     mkdir -p "$DISTR_DIR"
 
     cargo pgrx package --pg-config "$PG_CONFIG" --out-dir "$OUTPUT_DIR" --no-default-features
@@ -61,6 +61,6 @@ for PG_VERSION in "${!PG_CONFIGS[@]}"; do
 
 done
 
-cp "$DIR/install.sh" "$DIR/../distro/"
-cp "$DIR/uninstall.sh" "$DIR/../distro/"
+cp "$DIR/install.sh" "$DIR/../pg_cardano/"
+cp "$DIR/uninstall.sh" "$DIR/../pg_cardano/"
 echo "Packaging completed."

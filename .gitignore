@@ -1,9 +1,10 @@
 .DS_Store
 .idea/
 /target
-/distro
 /releases
+/pg_cardano
 *.iml
 **/*.rs.bk
 Cargo.lock
+
 

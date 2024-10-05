@@ -46,19 +46,19 @@ fi
 echo "Package name: $PACKAGE_NAME"
 echo "Package version: $PACKAGE_VERSION"
 
-DISTRO_DIR="$DIR/../distro"
+DISTRO_DIR="$DIR/../pg_cardano"
 if [ ! -d "$DISTRO_DIR" ]; then
-  echo "Directory distro not found. Running build.sh..."
+  echo "Directory pg_cardano not found. Running build.sh..."
   "$DIR/build.sh"
 fi
 
 if [ ! -d "$DISTRO_DIR" ]; then
-  echo "Error: Directory distro not found after build.sh."
+  echo "Error: Directory pg_cardano not found after build.sh."
   exit 1
 fi
 
 ARCHIVE_NAME="${PACKAGE_NAME}_linux_x64_v${PACKAGE_VERSION}.tar.gz"
-tar -czf "$DIR/$ARCHIVE_NAME" -C "$DISTRO_DIR" .
+tar -czf "$DIR/$ARCHIVE_NAME" -C "$DIR/.." "$(basename "$DISTRO_DIR")"
 
 RELEASES_DIR="$DIR/../releases"
 mkdir -p "$RELEASES_DIR"

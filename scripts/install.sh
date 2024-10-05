@@ -33,10 +33,10 @@ if [ -z "$PG_VERSION" ] || [ -z "$SHAREDIR" ] || [ -z "$PKGLIBDIR" ]; then
   exit 1
 fi
 
-TARGET_DIR="./pg$PG_VERSION"
+TARGET_DIR="./bin/pg$PG_VERSION"
 
 if [ ! -d "$TARGET_DIR" ]; then
-  TARGET_DIR="$DIR/../distro/pg$PG_VERSION"
+  TARGET_DIR="$DIR/../pg_cardano/bin/pg$PG_VERSION"
 fi
 
 if [ ! -d "$TARGET_DIR" ]; then
