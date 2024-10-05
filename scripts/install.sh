@@ -74,13 +74,13 @@ echo -e "${BOLD}${GREEN}========================================${RESET}"
 echo -e "${BOLD}${GREEN}EXTENSION PG_CARDANO IS READY TO USE!${RESET}"
 echo -e "${BOLD}${GREEN}========================================${RESET}"
 
-echo -e "\n1) Don't forget to activate the extension in your database:"
-echo "   To create the extension, run the following command in your PostgreSQL instance:"
+echo -e "Don't forget to activate the extension in your database!"
+echo -e " \n1) To create the extension, run the following command in your PostgreSQL instance:"
 echo -e "   ${BOLD}CREATE EXTENSION pg_cardano;${RESET}"
 
-echo -e "\n2) If the extension already exists, it's better to drop it before re-creating:"
-echo "   To drop the extension, run:"
-echo -e "   ${BOLD}DROP EXTENSION pg_cardano;${RESET}"
+echo -e "\n2) If the extension already exists, you can update it to the latest version:"
+echo -e "   ${BOLD}ALTER EXTENSION pg_cardano UPDATE;${RESET}"
 
 echo -e "\nFor more information, you can refer to the official documentation:"
 echo -e "   ${BLUE}https://github.com/Fell-x27/pg_cardano/blob/master/README.md${RESET}"
+

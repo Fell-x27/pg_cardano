@@ -2,8 +2,10 @@ mod tests;
 
 use pgrx::prelude::*;
 use serde_cbor::{to_vec, from_slice};
-use serde_json::Value;
+use serde_cbor::Value;
+use serde_json::json;
 use pgrx::JsonB;
+use pgrx::*;
 
 use bech32::{self, Bech32, Hrp, encode, decode};
 use bs58;
@@ -54,14 +56,55 @@ mod cardano {
     //Cbor
     #[pg_extern]
     pub(crate) fn cbor_encode_jsonb(input: JsonB) -> Vec<u8> {
-        let value: Value = serde_json::from_value(input.0).expect("Failed to parse JsonB");
+        let value: serde_json::Value = serde_json::from_value(input.0).expect("Failed to parse JsonB");
         to_vec(&value).expect("Failed to encode CBOR")
     }
 
     #[pg_extern]
     pub(crate) fn cbor_decode_jsonb(cbor_bytes: &[u8]) -> JsonB {
         let value: Value = from_slice(cbor_bytes).expect("Failed to decode CBOR");
-        JsonB(serde_json::to_value(&value).expect("Failed to convert to JsonB"))
+
+        fn cbor_to_json(value: Value) -> serde_json::Value {
+            match value {
+                Value::Null => json!(null),
+                Value::Bool(b) => json!(b),
+                Value::Integer(i) => json!(i),
+                Value::Float(f) => json!(f),
+                Value::Bytes(b) => {
+                    match from_slice::<Value>(&b) {
+                        Ok(nested_cbor) => {
+                            cbor_to_json(nested_cbor)
+                        },
+                        Err(_) => {
+                            json!(hex::encode(b))
+                        }
+                    }
+                }
+                Value::Text(t) => json!(t),
+                Value::Array(arr) => {
+                    json!(arr.into_iter().map(cbor_to_json).collect::<Vec<_>>())
+                }
+                Value::Map(map) => {
+                    let json_map: serde_json::Map<String, serde_json::Value> = map.into_iter()
+                        .map(|(k, v)| {
+                            let key = match k {
+                                Value::Text(t) => t,
+                                Value::Bytes(b) => format!("0x{}", hex::encode(b)),
+                                Value::Integer(i) => i.to_string(),
+                                _ => panic!("Unsupported key type for JSON map")
+                            };
+                            (key, cbor_to_json(v))
+                        })
+                        .collect();
+                    json!(json_map)
+                }
+                _ => panic!("Unsupported CBOR type for JSON conversion"),
+            }
+        }
+
+        let json_value = cbor_to_json(value);
+
+        JsonB(json_value)
     }
 
     // Blake2B

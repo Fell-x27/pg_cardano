@@ -117,19 +117,21 @@ cargo pgrx install --no-default-features --release --sudo
 You are awesome!
 
 # Using the Extension
-
 ## Create the Extension in PostgreSQL
 
-In order to use, you need to create it in your PostgreSQL database.
-
-If you already have it and want to update, drop it before:
+In order to use it, you need to create it in your PostgreSQL database:
 ```sql
-DROP EXTENSION IF EXISTS pg_cardano CASCADE;
+CREATE EXTENSION pg_cardano;
 ```
 
-Then create it:
+If you already have it installed and want to update to a new version, you can update it with:
 ```sql
-CREATE EXTENSION IF NOT EXISTS pg_cardano;
+ALTER EXTENSION pg_cardano UPDATE;
+```
+
+You can also remove it (along with any dependent objects) with:
+```sql
+DROP EXTENSION pg_cardano CASCADE;
 ```
 
 ## Examples
