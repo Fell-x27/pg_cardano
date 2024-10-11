@@ -6,6 +6,8 @@ mod tests {
     use std::ptr::null;
     use pgrx::prelude::*;
 
+
+
     #[pg_test]
     fn test_base58_enc() {
         let input = b"Cardano";

@@ -66,37 +66,40 @@ mod cardano {
 
         fn cbor_to_json(value: Value) -> serde_json::Value {
             match value {
-                Value::Null => json!(null),
-                Value::Bool(b) => json!(b),
-                Value::Integer(i) => json!(i),
-                Value::Float(f) => json!(f),
+                Value::Null => serde_json::Value::Null,
+                Value::Bool(b) => serde_json::Value::Bool(b),
+                Value::Integer(i) => serde_json::Value::Number(serde_json::Number::from(i as i64)),
+                Value::Float(f) => serde_json::Value::Number(serde_json::Number::from_f64(f).expect("Invalid float value")),
                 Value::Bytes(b) => {
-                    match from_slice::<Value>(&b) {
-                        Ok(nested_cbor) => {
-                            cbor_to_json(nested_cbor)
-                        },
-                        Err(_) => {
-                            json!(hex::encode(b))
-                        }
+                    if let Ok(nested_cbor) = from_slice::<Value>(&b) {
+                        cbor_to_json(nested_cbor)
+                    } else {
+                        serde_json::Value::String(hex::encode(b))
                     }
                 }
-                Value::Text(t) => json!(t),
+                Value::Text(t) => {
+                    let sanitized_text: String = t.chars().filter(|&c| c != '\u{0000}').collect();
+                    serde_json::Value::String(sanitized_text)
+                }
                 Value::Array(arr) => {
-                    json!(arr.into_iter().map(cbor_to_json).collect::<Vec<_>>())
+                    let mut json_array = Vec::with_capacity(arr.len());
+                    for item in arr {
+                        json_array.push(cbor_to_json(item));
+                    }
+                    serde_json::Value::Array(json_array)
                 }
                 Value::Map(map) => {
-                    let json_map: serde_json::Map<String, serde_json::Value> = map.into_iter()
-                        .map(|(k, v)| {
-                            let key = match k {
-                                Value::Text(t) => t,
-                                Value::Bytes(b) => format!("0x{}", hex::encode(b)),
-                                Value::Integer(i) => i.to_string(),
-                                _ => panic!("Unsupported key type for JSON map")
-                            };
-                            (key, cbor_to_json(v))
-                        })
-                        .collect();
-                    json!(json_map)
+                    let mut json_map = serde_json::Map::with_capacity(map.len());
+                    for (k, v) in map {
+                        let key = match k {
+                            Value::Text(t) => t,
+                            Value::Bytes(b) => format!("0x{}", hex::encode(b)),
+                            Value::Integer(i) => i.to_string(),
+                            _ => panic!("Unsupported key type for JSON map"),
+                        };
+                        json_map.insert(key, cbor_to_json(v));
+                    }
+                    serde_json::Value::Object(json_map)
                 }
                 _ => panic!("Unsupported CBOR type for JSON conversion"),
             }
@@ -106,6 +109,7 @@ mod cardano {
 
         JsonB(json_value)
     }
+
 
     // Blake2B
     #[pg_extern]
