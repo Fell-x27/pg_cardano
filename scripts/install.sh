@@ -33,18 +33,20 @@ if [ -z "$PG_VERSION" ] || [ -z "$SHAREDIR" ] || [ -z "$PKGLIBDIR" ]; then
   exit 1
 fi
 
-TARGET_DIR="./bin/pg$PG_VERSION"
+BIN_DIR="./bin/pg$PG_VERSION"
+MIGRATIONS_DIR="./migrations"
 
-if [ ! -d "$TARGET_DIR" ]; then
-  TARGET_DIR="$DIR/../pg_cardano/bin/pg$PG_VERSION"
+if [ ! -d "$BIN_DIR" ]; then
+  BIN_DIR="$DIR/../pg_cardano/bin/pg$PG_VERSION"
+  MIGRATIONS_DIR="$DIR/../pg_cardano/migrations"
 fi
 
-if [ ! -d "$TARGET_DIR" ]; then
+if [ ! -d "$BIN_DIR" ]; then
   echo -e "${BOLD}${RED}Error: Directory with pre-built extension for PostgreSQL $PG_VERSION not found.${RESET}"
   exit 1
 fi
 
-echo -e "${BOLD}${GREEN}Found extension directory: $TARGET_DIR${RESET}"
+echo -e "${BOLD}${GREEN}Found extension directory: $BIN_DIR${RESET}"
 
 echo -e "${BOLD}${BLUE}Now copying files to system directories, this requires sudo privileges.${RESET}"
 
@@ -52,19 +54,19 @@ sudo mkdir -p "$SHAREDIR"
 sudo mkdir -p "$SHAREDIR/extension/"
 sudo mkdir -p "$PKGLIBDIR"
 
-sudo cp "$TARGET_DIR"/*.control "$SHAREDIR/extension/" 2>/dev/null
+sudo cp "$MIGRATIONS_DIR"/*.control "$SHAREDIR/extension/" 2>/dev/null
 if [ $? -ne 0 ]; then
   echo -e "${BOLD}${RED}Error: Failed to copy control files to $SHAREDIR/extension.${RESET}"
   exit 1
 fi
 
-sudo cp "$TARGET_DIR"/*.sql "$SHAREDIR/extension/" 2>/dev/null
+sudo cp "$MIGRATIONS_DIR"/*.sql "$SHAREDIR/extension/" 2>/dev/null
 if [ $? -ne 0 ]; then
   echo -e "${BOLD}${RED}Error: Failed to copy SQL files to $SHAREDIR/extension.${RESET}"
   exit 1
 fi
 
-sudo cp "$TARGET_DIR"/*.so "$PKGLIBDIR/" 2>/dev/null
+sudo cp "$BIN_DIR"/*.so "$PKGLIBDIR/" 2>/dev/null
 if [ $? -ne 0 ]; then
   echo -e "${BOLD}${RED}Error: Failed to copy .so files to $PKGLIBDIR.${RESET}"
   exit 1
