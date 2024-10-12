@@ -134,6 +134,8 @@ You can also remove it (along with any dependent objects) with:
 DROP EXTENSION pg_cardano CASCADE;
 ```
 
+If you see errors during an update or reinstallation, try restarting your PostgreSQL server — it's fine :)
+
 ## Examples
 
 After creating the extension, you can use the various cryptographic and utility functions it provides. Below are examples of how to use these functions.
@@ -249,7 +251,7 @@ You can generate dRep View IDs according to CIP-105 and CIP-129 specifications.
 ```sql
 SELECT cardano.tools_drep_id_encode_cip105(
         '\x28111ae17ff8fdfbd4f39cabdb2705f1c0200b8e159106f34388b155'::bytea, --raw id
-        false --is it script?
+        FALSE --is it script?
 );  
 -- Returns 'drep19qg34ctllr7lh48nnj4akfc978qzqzuwzkgsdu6r3zc42e5y854'
 ```
@@ -259,7 +261,7 @@ SELECT cardano.tools_drep_id_encode_cip105(
 ```sql
 SELECT cardano.tools_drep_id_encode_cip129(
         '\x28111ae17ff8fdfbd4f39cabdb2705f1c0200b8e159106f34388b155'::bytea, --raw id
-        true --is it script?
+        TRUE --is it script?
 );  
 -- Returns 'drep1yv5pzxhp0lu0m7757ww2hke8qhcuqgqt3c2ezphngwytz4gj324g7'
 ```
@@ -289,7 +291,7 @@ SELECT cardano.tools_shelley_address_build(
   FALSE, --is payment cred a script?
   ''::bytea, --stake cred (empty for an enterprise address)
   FALSE, --is stake cred a script? (actually, it will be ignored anyway in this case)
-  0
+  0  -- network id
 );  
 -- Returns 'addr_test1vp6p2fglcl0snqlmrqym3vn794zh3k9hegekh6r9vcn7vfspyp8fn'
 ```
@@ -302,7 +304,7 @@ SELECT cardano.tools_shelley_address_build(
   FALSE,  --is payment cred a script? (actually, it will be ignored anyway in this case)
   '\x7c3ae2f2175c3d886b9daaa362533b7db1b30db6f2bafaed7569eeef'::bytea, --stake cred 
   FALSE, --is stake cred a script?
-  0
+  0  -- network id
 );  
 -- Returns 'stake_test1up7r4chjzawrmzrtnk42xcjn8d7mrvcdkmet47hdw457amcl9yr85'
 ```
@@ -321,7 +323,7 @@ SELECT cardano.tools_shelley_addr_extract_stake_cred('addr_test1qp6p2fglcl0snqlm
 -- Returns '\x7c3ae2f2175c3d886b9daaa362533b7db1b30db6f2bafaed7569eeef'
 ```
 
-- **Get address type:**
+- **Get Shelley Address type:**
 
 ```sql
 SELECT cardano.tools_shelley_addr_get_type('addr_test1vp6p2fglcl0snqlmrqym3vn794zh3k9hegekh6r9vcn7vfspyp8fn');  
