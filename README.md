@@ -253,7 +253,7 @@ SELECT cardano.tools_drep_id_encode_cip105(
         '\x28111ae17ff8fdfbd4f39cabdb2705f1c0200b8e159106f34388b155'::bytea, --raw id
         FALSE --is it script?
 );  
--- Returns 'drep19qg34ctllr7lh48nnj4akfc978qzqzuwzkgsdu6r3zc42e5y854'
+-- Returns 'drep_vkh19qg34ctllr7lh48nnj4akfc978qzqzuwzkgsdu6r3zc42lnl6a0'
 ```
 
 - **Encode dRep ID (CIP-129), using script:**
