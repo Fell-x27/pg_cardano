@@ -17,6 +17,7 @@
       - [Blake2b Hashing](#blake2b-hashing)
       - [Ed25519 Signing and Verification](#ed25519-signing-and-verification)
       - [dRep View ID Builders](#drep-view-id-builders)
+      - [Asset Name Conversion](#asset-name-conversion)
       - [Shelley Address Utilities](#shelley-address-utilities)
 
 ## About this project
