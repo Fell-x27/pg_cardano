@@ -266,6 +266,24 @@ SELECT cardano.tools_drep_id_encode_cip129(
 -- Returns 'drep1yv5pzxhp0lu0m7757ww2hke8qhcuqgqt3c2ezphngwytz4gj324g7'
 ```
 ---
+### **Asset Name Conversion**
+
+The `tools_read_asset_name` function helps handle `asset_name` values that may be either UTF-8 strings or raw hexadecimal values. If the input is valid UTF-8, it is returned as a string. Otherwise, the function encodes it in hex format.
+
+- **Convert an asset name that is a valid UTF-8 string:**
+
+```sql
+SELECT cardano.tools_read_asset_name(E'hello'::bytea);
+-- Returns 'hello'
+```
+
+- **Convert an asset name that is raw hex data:**
+
+```sql
+SELECT cardano.tools_read_asset_name(E'\\xdeadbeef'::bytea);
+-- Returns 'deadbeef'
+```
+---
 ### **Shelley Address Utilities**
 
 Build and extract data from Shelley addresses.
