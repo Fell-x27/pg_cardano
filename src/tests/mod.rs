@@ -165,6 +165,35 @@ mod tests {
     }
 
     #[pg_test]
+    fn test_read_asset_name_utf8() {
+        let utf8_bytes = "hello".as_bytes();
+        let result = crate::cardano::tools_read_asset_name(utf8_bytes);
+        assert_eq!(result, "hello");
+    }
+
+    #[pg_test]
+    fn test_read_asset_name_non_utf8() {
+        let non_utf8_bytes = hex::decode("deadbeef").expect("Failed to decode hex");
+        let result = crate::cardano::tools_read_asset_name(&non_utf8_bytes);
+        assert_eq!(result, "deadbeef");
+    }
+
+    #[pg_test]
+    fn test_read_asset_name_mixed_utf8() {
+        let mixed_utf8_bytes = hex::decode("e282ac41").expect("Failed to decode hex"); // "€A"
+        let result = crate::cardano::tools_read_asset_name(&mixed_utf8_bytes);
+        assert_eq!(result, "€A");
+    }
+
+    #[pg_test]
+    fn test_read_asset_name_empty() {
+        let empty_bytes: &[u8] = &[];
+        let result = crate::cardano::tools_read_asset_name(empty_bytes);
+        assert_eq!(result, "");
+    }
+
+
+    #[pg_test]
     fn test_build_shelley_base_address() {
         let p_cred = hex::decode("7415251fc7df0983fb1809b8b27e2d4578d8b7ca336be8656627e626").expect("Failed to decode hex");
         let s_cred = hex::decode("7c3ae2f2175c3d886b9daaa362533b7db1b30db6f2bafaed7569eeef").expect("Failed to decode hex");
