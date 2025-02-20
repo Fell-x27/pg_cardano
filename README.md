@@ -189,7 +189,7 @@ SELECT cardano.bech32_decode_data('ada1d9ejqctdv9axjmn8dypl4d');
 ---
 ### **CBOR Encoding and Decoding**
 
-Encode JSONB data to CBOR format or decode CBOR back to JSONB.
+Encode JSONB data to CBOR format or decode CBOR back to JSONB/JSON.
 
 - **Encode JSONB to CBOR:**
 
