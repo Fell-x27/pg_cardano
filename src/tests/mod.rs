@@ -3,9 +3,12 @@ use pgrx::prelude::*;
 #[cfg(any(test, feature = "pg_test"))]
 #[pg_schema]
 mod tests {
-    use std::ptr::null;
+    use serde_json::to_string;
+use std::ptr::null;
     use pgrx::prelude::*;
-
+    use linked_hash_map::LinkedHashMap;
+    use serde_json::{json, Value, Map};
+    use hex;
 
 
     #[pg_test]
@@ -55,7 +58,34 @@ mod tests {
     }
 
     #[pg_test]
-    fn test_cbor_enc() {
+    fn test_cbor_enc_json() {
+        // Ручное формирование JSON-строки, порядок ключей фиксирован
+        let json_str = r#"{"ada":"is amazing!","features":["science","approach"], "version":1.0}"#;
+
+        let expected_output = hex::decode("a3636164616b697320616d617a696e67216866656174757265738267736369656e636568617070726f6163686776657273696f6ef93c00")
+            .expect("Failed to decode hex");
+
+        let result = crate::cardano::cbor_encode_json(json_str.to_string());
+
+        assert_eq!(expected_output, result);
+    }
+
+    #[pg_test]
+    fn test_cbor_enc_json_swapped() {
+        // Ручное формирование JSON-строки, порядок ключей фиксирован
+        let json_str = r#"{"version":1.0,"features":["science","approach"],"ada":"is amazing!"}"#;
+
+        let expected_output = hex::decode("a3636164616b697320616d617a696e67216866656174757265738267736369656e636568617070726f6163686776657273696f6ef93c00")
+            .expect("Failed to decode hex");
+
+        let result = crate::cardano::cbor_encode_json(json_str.to_string());
+
+        assert_eq!(expected_output, result);
+    }
+
+
+    #[pg_test]
+    fn test_cbor_enc_jsonb() {
         let original_json = pgrx::JsonB(serde_json::json!({
         "ada": "is amazing!",
         "features": [
@@ -72,15 +102,44 @@ mod tests {
         assert_eq!(expected_output, result);
     }
 
+    // #[pg_test]
+    // fn test_cbor_enc_with_hex() {
+    //     let original_json = pgrx::JsonB(serde_json::json!({
+    //         "1": "0x6648d73a09b282c120c8476789f8232b7eead94ff560917ae8fc4eb1"
+    //         }
+    //     ));
+    //
+    //     let expected_output = hex::decode("a5018201581c4a930ad12820627500fbd68b071a22ef558acbdfbff53699f21152ce0280038102041a08d7226b07582057758911253f6b31df2a87c10eb08a2c9b8450768cb8dd0d378d93f7c2e220f0")
+    //         .expect("Failed to decode hex");
+    //     let result = crate::cardano::cbor_encode_jsonb(original_json);
+    //
+    //     assert_eq!(expected_output, result);
+    // }
+
+
+    // #[pg_test]
+    // fn test_cbor_enc_with_no_hex() {
+    //     let original_json = pgrx::JsonB(serde_json::json!({
+    //         "1": "0x6648d73a09b282c120c8476789f8232b7eead94ff560917ae8fc4eb1"
+    //         }
+    //     ));
+    //
+    //     let expected_output = hex::decode("a5018201581c4a930ad12820627500fbd68b071a22ef558acbdfbff53699f21152ce0280038102041a08d7226b07582057758911253f6b31df2a87c10eb08a2c9b8450768cb8dd0d378d93f7c2e220f0")
+    //         .expect("Failed to decode hex");
+    //     let result = crate::cardano::cbor_encode_jsonb(original_json);
+    //
+    //     assert_eq!(expected_output, result);
+    // }
+
     #[pg_test]
-    fn test_cbor_dec() {
+    fn test_cbor_dec_to_jsonb() {
         let original_json = pgrx::JsonB(serde_json::json!({
         "ada": "is amazing!",
+        "version": 1.0,
         "features": [
             "science",
             "approach"
-        ],
-        "version": 1.0
+        ]
     }));
 
         let cbor_bytes = hex::decode("a3636164616b697320616d617a696e67216866656174757265738267736369656e636568617070726f6163686776657273696f6ef93c00")
@@ -92,6 +151,29 @@ mod tests {
 
         assert_eq!(expected_output, result_str);
     }
+
+    #[pg_test]
+    fn test_cbor_dec_to_json() {
+        let original_json = pgrx::Json(serde_json::json!({
+        "ada": "is amazing!",
+        "features": [
+            "science",
+            "approach"
+        ],
+        "version": 1.0
+    }));
+//TODO: переписать так, чтобы порядок был важен
+        let cbor_bytes = hex::decode("a3636164616b697320616d617a696e67216866656174757265738267736369656e636568617070726f6163686776657273696f6ef93c00")
+            .expect("Failed to decode hex");
+        let result_str = crate::cardano::cbor_decode_json(&cbor_bytes);
+
+        let expected_str = serde_json::to_string(&original_json)
+            .expect("Failed to serialize expected JSON");
+
+        assert_eq!(expected_str, result_str);
+    }
+
+
 
     #[pg_test]
     fn test_blake2b_hash() {
