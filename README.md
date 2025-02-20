@@ -192,7 +192,9 @@ SELECT cardano.bech32_decode_data('ada1d9ejqctdv9axjmn8dypl4d');
 Encode JSONB data to CBOR format or decode CBOR back to JSONB.
 
 - **Encode JSONB to CBOR:**
+
   Any field containing a hex-encoded string that begins with `0x` will be encoded as a byte array. Otherwise, it will be encoded as a string.
+
   If you want to decode and re-encode your data within the same query, please use decoders with the mark_hex postfix! These will be described below.
 ```sql
 SELECT cardano.cbor_encode_jsonb('{"ada": "is amazing!", "version": 1.0, "hex": "0xdeadbeef", "hexlike": "deadbeaf"}'::jsonb);
