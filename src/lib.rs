@@ -1,31 +1,26 @@
+mod helpers;
 mod tests;
 
-use pgrx::prelude::*;
-use serde_cbor::{to_vec, from_slice};
-use serde_cbor::Value;
-use serde_json::{Map, Value as JsonValue};
-use hex;
-use pgrx::JsonB;
-use pgrx::*;
-use linked_hash_map::LinkedHashMap;
-
-use bech32::{self, Bech32, Hrp, encode, decode};
+use bech32::{self, decode, encode, Bech32, Hrp};
 use bs58;
+use helpers::*;
+use hex;
+use pgrx::prelude::*;
+use pgrx::*;
+use serde_cbor::Value;
+use serde_cbor::{from_slice, to_vec};
+use serde_json::Value as JsonValue;
 
-use blake2::{Blake2bVar};
-use blake2::digest::{VariableOutput, Update};
+use blake2::digest::{Update, VariableOutput};
+use blake2::Blake2bVar;
 
-use ed25519_dalek::{Signature, Signer, Verifier, SigningKey, VerifyingKey};
-
+use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
 
 pg_module_magic!();
 
 #[pg_schema]
 mod cardano {
-    use std::collections::BTreeMap;
-    use indexmap::IndexMap;
-    use serde_json::Deserializer;
-use super::*;
+    use super::*;
     //Base58
     #[pg_extern]
     pub(crate) fn base58_encode(input: &[u8]) -> String {
@@ -61,64 +56,48 @@ use super::*;
     //Cbor
     #[pg_extern]
     pub(crate) fn cbor_encode_jsonb(input: JsonB) -> Vec<u8> {
-        let value: serde_json::Value = serde_json::from_value(input.0).expect("Failed to parse JsonB");
-        to_vec(&value).expect("Failed to encode CBOR")
+        let value: JsonValue = serde_json::from_value(input.0).expect("Failed to parse JsonB");
+        let transformed = transform_json(value);
+        to_vec(&transformed).expect("Failed to encode CBOR")
     }
 
-
     #[pg_extern]
-    pub fn cbor_decode_json(cbor_bytes: &[u8]) -> String {
+    pub fn cbor_decode_json(
+        cbor_bytes: &[u8],
+    ) -> String {
         let value: Value = from_slice(cbor_bytes).expect("Failed to decode CBOR");
-        let json_value = cbor_to_json(value);
+        let json_value = cbor_to_json(value, false);
         serde_json::to_string(&json_value).expect("Failed to serialize JSON")
     }
 
     #[pg_extern]
-    pub fn cbor_decode_jsonb(cbor_bytes: &[u8]) -> JsonB {
-        JsonB(cbor_to_json(from_slice(cbor_bytes).expect("Failed to decode CBOR")))
+    pub fn cbor_decode_jsonb(
+        cbor_bytes: &[u8],
+    ) -> JsonB {
+        JsonB(cbor_to_json(
+            from_slice(cbor_bytes).expect("Failed to decode CBOR"),
+            false,
+        ))
     }
 
-    fn cbor_to_json(value: Value) -> JsonValue {
-        match value {
-            Value::Null => JsonValue::Null,
-            Value::Bool(b) => JsonValue::Bool(b),
-            Value::Integer(i) => JsonValue::Number(serde_json::Number::from(i as i64)), // Оставил без изменений
-            Value::Float(f) => JsonValue::Number(serde_json::Number::from_f64(f).expect("Invalid float value")),
-            Value::Bytes(b) => {
-                if let Ok(nested_cbor) = from_slice::<Value>(&b) {
-                    cbor_to_json(nested_cbor)
-                } else {
-                    JsonValue::String(hex::encode(b))
-                }
-            }
-            Value::Text(t) => {
-                let sanitized_text: String = t.chars().filter(|&c| c != '\u{0}').collect();
-                JsonValue::String(sanitized_text)
-            }
-            Value::Array(arr) => {
-                let mut json_array = Vec::with_capacity(arr.len());
-                for item in arr {
-                    json_array.push(cbor_to_json(item));
-                }
-                JsonValue::Array(json_array)
-            }
-            Value::Map(map) => {
-                let mut json_map = Map::with_capacity(map.len());
-                for (k, v) in map {
-                    let key = match k {
-                        Value::Text(t) => t,
-                        Value::Bytes(b) => hex::encode(b),
-                        Value::Integer(i) => i.to_string(),
-                        _ => hex::encode(serde_cbor::to_vec(&k).unwrap()),
-                    };
-                    json_map.insert(key, cbor_to_json(v));
-                }
-                JsonValue::Object(json_map)
-            }
-            _ => JsonValue::String(hex::encode(serde_cbor::to_vec(&value).unwrap())),
-        }
+    #[pg_extern]
+    pub fn cbor_decode_json_mark_hex(
+        cbor_bytes: &[u8],
+    ) -> String {
+        let value: Value = from_slice(cbor_bytes).expect("Failed to decode CBOR");
+        let json_value = cbor_to_json(value, true);
+        serde_json::to_string(&json_value).expect("Failed to serialize JSON")
     }
 
+    #[pg_extern]
+    pub fn cbor_decode_jsonb_mark_hex(
+        cbor_bytes: &[u8],
+    ) -> JsonB {
+        JsonB(cbor_to_json(
+            from_slice(cbor_bytes).expect("Failed to decode CBOR"),
+            true,
+        ))
+    }
 
     // Blake2B
     #[pg_extern]
@@ -131,25 +110,38 @@ use super::*;
         hasher.update(input);
 
         let mut output = vec![0u8; output_length];
-        hasher.finalize_variable(&mut output).expect("Failed to finalize hash");
+        hasher
+            .finalize_variable(&mut output)
+            .expect("Failed to finalize hash");
 
         output
     }
 
-
     // ed25519 sign
     #[pg_extern]
     pub(crate) fn ed25519_sign_message(secret_key_bytes: &[u8], message: &[u8]) -> Vec<u8> {
-        let signing_key = SigningKey::from_bytes(&secret_key_bytes.try_into().expect("Invalid secret key length"));
+        let signing_key = SigningKey::from_bytes(
+            &secret_key_bytes
+                .try_into()
+                .expect("Invalid secret key length"),
+        );
         let signature: Signature = signing_key.sign(message);
         signature.to_bytes().to_vec()
     }
 
     // ed25519 ver
     #[pg_extern]
-    pub(crate) fn ed25519_verify_signature(public_key_bytes: &[u8], message: &[u8], signature_bytes: &[u8]) -> bool {
-        let verifying_key = VerifyingKey::from_bytes(&public_key_bytes.try_into().expect("Invalid public key length"))
-            .expect("Invalid public key");
+    pub(crate) fn ed25519_verify_signature(
+        public_key_bytes: &[u8],
+        message: &[u8],
+        signature_bytes: &[u8],
+    ) -> bool {
+        let verifying_key = VerifyingKey::from_bytes(
+            &public_key_bytes
+                .try_into()
+                .expect("Invalid public key length"),
+        )
+        .expect("Invalid public key");
         let signature = Signature::try_from(&signature_bytes[..]).expect("Invalid signature");
         verifying_key.verify(message, &signature).is_ok()
     }
@@ -239,36 +231,23 @@ use super::*;
         address_bytes.extend_from_slice(stake_cred);
 
         let addr_prefix = if payment_cred.is_empty() {
-            if network_id == 0 { "stake_test" } else { "stake" }
+            if network_id == 0 {
+                "stake_test"
+            } else {
+                "stake"
+            }
         } else {
-            if network_id == 0 { "addr_test" } else { "addr" }
+            if network_id == 0 {
+                "addr_test"
+            } else {
+                "addr"
+            }
         };
 
         bech32_encode(addr_prefix, &address_bytes)
     }
 
     // Shelley Addr extractors
-    pub(crate) fn helper_shelley_addr_extract_main_cred(shelley_address_bech32: &str) -> Vec<u8> {
-        let raw_address = bech32_decode_data(&shelley_address_bech32);
-
-        if raw_address.len() < 29 {
-            panic!("Invalid address length: {}. Expected at least 29 bytes.", raw_address.len());
-        }
-
-        let main_cred = raw_address[1..29].to_vec();
-        main_cred
-    }
-
-    pub(crate) fn helper_shelley_addr_extract_additional_cred(shelley_address_bech32: &str) -> Vec<u8> {
-        let raw_address = bech32_decode_data(&shelley_address_bech32);
-
-        if raw_address.len() != 57 {
-            panic!("Invalid address length: {} . Expected 57 bytes.", raw_address.len());
-        }
-
-        let additional_cred = raw_address[29..57].to_vec();
-        additional_cred
-    }
     #[pg_extern]
     pub(crate) fn tools_shelley_addr_extract_payment_cred(shelley_address_bech32: &str) -> Vec<u8> {
         let raw_address = bech32_decode_data(&shelley_address_bech32);
@@ -276,7 +255,7 @@ use super::*;
 
         match addr_type_byte {
             0b0000 | 0b0001 | 0b0010 | 0b0011 | 0b0100 | 0b0101 | 0b0110 | 0b0111 => {
-                helper_shelley_addr_extract_main_cred(&shelley_address_bech32)
+                helper_shelley_addr_extract_main_cred(bech32_decode_data, &shelley_address_bech32)
             }
             0b1110 | 0b1111 => panic!("Address does not contain payment data!"),
             _ => panic!("Invalid addr type. Expected Shelley-era address."),
@@ -290,15 +269,17 @@ use super::*;
 
         match addr_type_byte {
             0b0000 | 0b0001 | 0b0010 | 0b0011 | 0b0100 | 0b0101 | 0b0110 | 0b0111 => {
-                helper_shelley_addr_extract_additional_cred(&shelley_address_bech32)
+                helper_shelley_addr_extract_additional_cred(
+                    bech32_decode_data,
+                    &shelley_address_bech32,
+                )
             }
             0b1110 | 0b1111 => {
-                helper_shelley_addr_extract_main_cred(&shelley_address_bech32)
+                helper_shelley_addr_extract_main_cred(bech32_decode_data, &shelley_address_bech32)
             }
             _ => panic!("Invalid addr type. Expected Shelley-era address."),
         }
     }
-
 
     // Shelley Addr type detector
     #[pg_extern]
@@ -324,7 +305,6 @@ use super::*;
 }
 
 ////////////////////// TESTS ///////////////////////////
-
 
 /// This module is required by `cargo pgrx test` invocations.
 /// It must be visible at the root of your extension crate.

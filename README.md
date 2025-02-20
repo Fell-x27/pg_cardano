@@ -192,18 +192,53 @@ SELECT cardano.bech32_decode_data('ada1d9ejqctdv9axjmn8dypl4d');
 Encode JSONB data to CBOR format or decode CBOR back to JSONB.
 
 - **Encode JSONB to CBOR:**
-
+  Any field containing a hex-encoded string that begins with `0x` will be encoded as a byte array. Otherwise, it will be encoded as a string.
+  If you want to decode and re-encode your data within the same query, please use decoders with the mark_hex postfix! These will be described below.
 ```sql
-SELECT cardano.cbor_encode_jsonb('{"ada": "is amazing!", "version": 1.0}'::jsonb);  
--- Returns '\xa2636164616b697320616d617a696e67216776657273696f6ef93c00'
+SELECT cardano.cbor_encode_jsonb('{"ada": "is amazing!", "version": 1.0, "hex": "0xdeadbeef", "hexlike": "deadbeaf"}'::jsonb);
+-- Returns '\xa4636164616b697320616d617a696e67216368657844deadbeef676865786c696b656864656164626561666776657273696f6ef93c00'
 ```
 
 - **Decode CBOR to JSONB:**
 
+  Please note that hex fields will be decoded as strings. It's convenient to use them as `bytea` further.
+
+  Please note that JSONB sorts its fields for internal optimizations.
 ```sql
-SELECT cardano.cbor_decode_jsonb('\xa2636164616b697320616d617a696e67216776657273696f6ef93c00'::bytea);  
--- Returns '{"ada":"is amazing!","version":1.0}'
+SELECT cardano.cbor_decode_jsonb('\xa4636164616b697320616d617a696e67216368657844deadbeef676865786c696b656864656164626561666776657273696f6ef93c00'::bytea);  
+-- Returns ' {"ada": "is amazing!", "hex": "deadbeef", "hexlike": "deadbeaf", "version": 1.0}'
 ```
+
+- **Decode CBOR to JSON:**
+
+  Please note that hex fields will be decoded as strings. It's convenient to use them as `bytea` further.
+
+  The key difference is that fields will be decoded in their original order, whereas JSONB may change the order.
+```sql
+SELECT cardano.cbor_decode_json('\xa4636164616b697320616d617a696e67216368657844deadbeef676865786c696b656864656164626561666776657273696f6ef93c00'::bytea);
+-- Returns '{"ada":"is amazing!","hex":"deadbeef","hexlike":"deadbeaf","version":1.0}'
+```
+
+- **Decode CBOR to JSONB with marked hex-fields:**
+
+  If fields contain hex values, their values will be prefixed with `0x`. This is convenient if you want to encode them back later.
+
+  Please note that JSONB sorts its fields for internal optimizations.
+```sql
+ SELECT cardano.cbor_decode_jsonb_mark_hex('\xa4636164616b697320616d617a696e67216368657844deadbeef676865786c696b656864656164626561666776657273696f6ef93c00'::bytea);  
+-- Returns '{"ada": "is amazing!", "hex": "0xdeadbeef", "hexlike": "deadbeaf", "version": 1.0}'
+```
+
+- **Decode CBOR to JSON with marked hex-fields:**
+
+  If fields contain hex values, their values will be prefixed with `0x`. This is convenient if you want to encode them back later.
+
+  The key difference is that fields will be decoded in their original order, whereas JSONB may change the order.
+```sql
+ SELECT cardano.cbor_decode_json_mark_hex('\xa4636164616b697320616d617a696e67216368657844deadbeef676865786c696b656864656164626561666776657273696f6ef93c00'::bytea);
+-- Returns '{"ada": "is amazing!", "hex": "0xdeadbeef", "hexlike": "deadbeaf", "version": 1.0}'
+```
+
 ---
 ### **Blake2b Hashing**
 
