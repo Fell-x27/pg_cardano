@@ -1,6 +1,6 @@
 [package]
 name = "pg_cardano"
-version = "1.0.4"
+version = "1.0.5"
 edition = "2021"
 
 [lib]
@@ -29,11 +29,13 @@ serde_json = "1.0"
 blake2 = "0.10"
 ed25519-dalek = "2.1"
 rand = "0.8"
-pgrx ="0.12"
+pgrx = { version = "0.12"}
 hex = "0.4.3"
+linked-hash-map = { version = "0.5", features = ["serde"] }
+indexmap = { version = "2.7.1", features = ["serde"] }
 
 [dev-dependencies]
-pgrx-tests = "=0.12.5"
+pgrx-tests = "=0.12"
 
 [profile.dev]
 panic = "unwind"

@@ -189,24 +189,25 @@ SELECT cardano.bech32_decode_data('ada1d9ejqctdv9axjmn8dypl4d');
 ---
 ### **CBOR Encoding and Decoding**
 
-Encode JSONB data to CBOR format or decode CBOR back to JSONB.
+Encode JSONB data to CBOR format or decode CBOR back to JSONB/JSON.
 
-- **Encode JSONB to CBOR:**
-
+- **Encode JSONB to CBOR:**  
+  Any string containing a hex-encoded data that begins with `\\x` will be encoded as a **_byte array_**. Otherwise, it will be encoded as a string.  
+  >Please note that **_JSONB sorts its fields_** for internal optimizations.
 ```sql
-SELECT cardano.cbor_encode_jsonb('{"ada": "is amazing!", "version": 1.0}'::jsonb);  
--- Returns '\xa2636164616b697320616d617a696e67216776657273696f6ef93c00'
+SELECT cardano.cbor_encode_jsonb('{"ada": "is amazing!", "version": 1.0, "hex": "\\xdeadbeef", "hexlike": "deadbeaf"}'::jsonb);
+-- Returns '\xa4636164616b697320616d617a696e67216368657844deadbeef676865786c696b656864656164626561666776657273696f6ef93c00'
 ```
 
-- **Decode CBOR to JSONB:**
-
+- **Decode CBOR to JSONB:**  
+  If fields contain hex values, their values will be prefixed with `\\x`, so you can use them as a `bytea`.   
+  >Please note that **_JSONB sorts its fields_** for internal optimizations.
 ```sql
-SELECT cardano.cbor_decode_jsonb('\xa2636164616b697320616d617a696e67216776657273696f6ef93c00'::bytea);  
--- Returns '{"ada":"is amazing!","version":1.0}'
+SELECT cardano.cbor_decode_jsonb('\xa4636164616b697320616d617a696e6721676865786c696b656864656164626561666368657844deadbeef6776657273696f6ef93c00'::bytea);  
+-- Returns ' {"ada": "is amazing!", "hex": "\\xdeadbeef", "hexlike": "deadbeaf", "version": 1.0}'
 ```
 ---
-### **Blake2b Hashing**
-
+### **Blake2b Hashing**  
 Hash data using the Blake2b algorithm with a specified output length (between 1 and 64 bytes).
 
 - **Hash with Blake2b:**
@@ -243,8 +244,7 @@ SELECT cardano.ed25519_verify_signature(
 -- Returns 't' for 'true'
 ```
 ---
-### **dRep View ID Builders**
-
+### **dRep View ID Builders**  
 You can generate dRep View IDs according to CIP-105 and CIP-129 specifications.
 
 - **Encode dRep ID (CIP-105),  using public key:**
@@ -267,8 +267,7 @@ SELECT cardano.tools_drep_id_encode_cip129(
 -- Returns 'drep1yv5pzxhp0lu0m7757ww2hke8qhcuqgqt3c2ezphngwytz4gj324g7'
 ```
 ---
-### **Asset Name Conversion**
-
+### **Asset Name Conversion**  
 The `tools_read_asset_name` function helps handle `asset_name` values that may be either UTF-8 strings or raw hexadecimal values. If the input is valid UTF-8, it is returned as a string. Otherwise, the function encodes it in hex format.
 
 - **Convert an asset name that is a valid UTF-8 string:**
