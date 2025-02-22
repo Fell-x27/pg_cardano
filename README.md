@@ -1,14 +1,14 @@
 # Contents
 
 1. [About this project](#about-this-project)
-3. [Installing Pre-built Binaries](#installing-pre-built-binaries)
-4. [Building from sources](#building-from-sources)
+2. [Installing Pre-built Binaries](#installing-pre-built-binaries)
+3. [Building from sources](#building-from-sources)
     - [0. Requirements](#0-requirements)
     - [1. Install Rust](#1-install-rust)
     - [2. Clone the Repository and install dependencies](#2-clone-the-repository-and-install-dependencies)
     - [3. Test the Extension](#3-test-the-extension-optional)
     - [4. Build and Install the Extension](#4-build-and-install-the-extension)
-6. [Using the Extension](#using-the-extension)
+4. [Using the Extension](#using-the-extension)
     - [Create the Extension in PostgreSQL](#create-the-extension-in-postgresql)
     - [Examples](#examples)
       - [Base58 Encoding and Decoding](#base58-encoding-and-decoding)
@@ -19,6 +19,7 @@
       - [dRep View ID Builders](#drep-view-id-builders)
       - [Asset Name Conversion](#asset-name-conversion)
       - [Shelley Address Utilities](#shelley-address-utilities)
+      - [CIP-88](#cip-88)
 
 ## About this project
 
@@ -195,19 +196,28 @@ Encode JSONB data to CBOR format or decode CBOR back to JSONB/JSON.
   Any string containing a hex-encoded data that begins with `\\x` will be encoded as a **_byte array_**. Otherwise, it will be encoded as a string.  
   >Please note that **_JSONB sorts its fields_** for internal optimizations.
 ```sql
-SELECT cardano.cbor_encode_jsonb('{"ada": "is amazing!", "version": 1.0, "hex": "\\xdeadbeef", "hexlike": "deadbeaf"}'::jsonb);
--- Returns '\xa4636164616b697320616d617a696e67216368657844deadbeef676865786c696b656864656164626561666776657273696f6ef93c00'
+SELECT cardano.cbor_encode_jsonb('{"ada": "is amazing!", "version": 1.0, "bytes": "\\xdeadbeef"}');
+-- Returns '\xa3636164616b697320616d617a696e672165627974657344deadbeef6776657273696f6ef93c00'
 ```
 
 - **Decode CBOR to JSONB:**  
-  If fields contain hex values, their values will be prefixed with `\\x`, so you can use them as a `bytea`.   
+  If fields contain `bytes` values, they will be represented as plain hex-like strings.   
   >Please note that **_JSONB sorts its fields_** for internal optimizations.
 ```sql
-SELECT cardano.cbor_decode_jsonb('\xa4636164616b697320616d617a696e6721676865786c696b656864656164626561666368657844deadbeef6776657273696f6ef93c00'::bytea);  
--- Returns ' {"ada": "is amazing!", "hex": "\\xdeadbeef", "hexlike": "deadbeaf", "version": 1.0}'
+SELECT cardano.cbor_decode_jsonb('\xa3636164616b697320616d617a696e672165627974657344deadbeef6776657273696f6ef93c00');  
+-- Returns '{"ada": "is amazing!", "bytes": "deadbeef", "version": 1.0}'
 ```
+
+- **Decode CBOR to JSONB with bytearrays:**  
+  If fields contain `bytes` values, they will be represented as plain hex-like strings prefixed with `\\x`, so you can use them as `bytea`.
+  >Please note that **_JSONB sorts its fields_** for internal optimizations.
+```sql
+SELECT cardano.cbor_decode_jsonb_hex2bytea('\xa3636164616b697320616d617a696e672165627974657344deadbeef6776657273696f6ef93c00');  
+-- Returns '{"ada": "is amazing!", "bytes": "\\xdeadbeef", "version": 1.0}'
+```
+
 ---
-### **Blake2b Hashing**  
+### **Blake2b Hashing**
 Hash data using the Blake2b algorithm with a specified output length (between 1 and 64 bytes).
 
 - **Hash with Blake2b:**
@@ -244,7 +254,7 @@ SELECT cardano.ed25519_verify_signature(
 -- Returns 't' for 'true'
 ```
 ---
-### **dRep View ID Builders**  
+### **dRep View ID Builders**
 You can generate dRep View IDs according to CIP-105 and CIP-129 specifications.
 
 - **Encode dRep ID (CIP-105),  using public key:**
@@ -267,7 +277,7 @@ SELECT cardano.tools_drep_id_encode_cip129(
 -- Returns 'drep1yv5pzxhp0lu0m7757ww2hke8qhcuqgqt3c2ezphngwytz4gj324g7'
 ```
 ---
-### **Asset Name Conversion**  
+### **Asset Name Conversion**
 The `tools_read_asset_name` function helps handle `asset_name` values that may be either UTF-8 strings or raw hexadecimal values. If the input is valid UTF-8, it is returned as a string. Otherwise, the function encodes it in hex format.
 
 - **Convert an asset name that is a valid UTF-8 string:**
@@ -358,4 +368,28 @@ SELECT cardano.tools_shelley_addr_get_type('addr_test1vp6p2fglcl0snqlmrqym3vn794
 --         "STK_KEY"
 --         "STK_SCRIPT"
 --         "UNKNOWN"
+```
+---
+### **CIP-88**
+There is a function for verifying the authenticity of the pool key registration procedure according to CIP-88.  
+It takes CBOR transaction metadata as input, which describes the registration.
+```sql
+SELECT  cardano.tools_verify_cip88_pool_key_registration(E'\\xa1190363a3000201a5018201581c6648d73a09b282c120c8476789f8232b7eead94ff560917ae8fc4eb10280038102041a08d77f10075820fb01193646bb8820cc8c1fc70752d068e1b37be2f1aef88a2bc70cf598de6a630281a201a40101032720062158201ca00b7625ea6a25a6c8c128e308877a563d133ff108147fd1edc36eca3a447c02845829a201276761646472657373581c6648d73a09b282c120c8476789f8232b7eead94ff560917ae8fc4eb10058203a1807ae73acd6dc91f39fa2f6d24e0996d348bb21939e1d9bc5cd75dd778a6858406b8978326e011a9531ac55040adeba410edd9ad8d28b59ad2b7b7d5923b82745ed85155c0ba367b2e54aa8e1f91eb96a58e8249f89d5d0b1f83ba4946d808607');
+-- Returns 't' for 'true'
+```
+
+Or something like this (preview testnet):
+```sql
+
+SELECT cardano.tools_verify_cip88_pool_key_registration(meta.bytes)
+FROM LATERAL (
+    SELECT bytes
+    FROM tx_metadata
+    WHERE tx_id = (
+        SELECT id
+        FROM tx
+        WHERE hash = E'\\xb79fadc3a703f1e54e132b1fbbb45a0dbcb6599b68c104e56de8cdf192d2e4c7'
+    )
+    ) AS meta;
+-- Returns 't' for 'true'
 ```

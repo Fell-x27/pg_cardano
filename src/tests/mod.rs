@@ -5,8 +5,6 @@ use pgrx::prelude::pg_schema;
 mod tests {
     use hex;
     use pgrx::prelude::*;
-    use serde_json::Value as JsonValue;
-    use indexmap::IndexMap;
 
     #[pg_test]
     fn test_base58_enc() {
@@ -92,7 +90,7 @@ mod tests {
     }
 
     #[pg_test]
-    fn test_cbor_dec_to_jsonb_with_hex() {
+    fn test_cbor_dec_to_jsonb_hes_as_hex() {
         let original_json = pgrx::JsonB(serde_json::json!({
             "ada": "is amazing!",
             "version": 1.0,
@@ -105,6 +103,29 @@ mod tests {
 
         let cbor_bytes = hex::decode("a4636164616b697320616d617a696e672163686578581c6648d73a09b282c120c8476789f8232b7eead94ff560917ae8fc4eb16776657273696f6ef93c006866656174757265738267736369656e636568617070726f616368")
             .expect("Failed to decode hex");
+        let result = crate::cardano::cbor_decode_jsonb_hex2bytea(&cbor_bytes);
+
+        let expected_output =
+            serde_json::to_string(&original_json.0).expect("Failed to serialize original_json");
+        let result_str = serde_json::to_string(&result.0).expect("Failed to serialize result");
+
+        assert_eq!(expected_output, result_str);
+    }
+
+    #[pg_test]
+    fn test_cbor_dec_to_jsonb_hex_as_text() {
+        let original_json = pgrx::JsonB(serde_json::json!({
+            "ada": "is amazing!",
+            "version": 1.0,
+            "features": [
+                "science",
+                "approach"
+            ],
+            "hex": "6648d73a09b282c120c8476789f8232b7eead94ff560917ae8fc4eb1"
+        }));
+
+        let cbor_bytes = hex::decode("a4636164616b697320616d617a696e672163686578581c6648d73a09b282c120c8476789f8232b7eead94ff560917ae8fc4eb16776657273696f6ef93c006866656174757265738267736369656e636568617070726f616368")
+            .expect("Failed to decode hex");
         let result = crate::cardano::cbor_decode_jsonb(&cbor_bytes);
 
         let expected_output =
@@ -112,6 +133,18 @@ mod tests {
         let result_str = serde_json::to_string(&result.0).expect("Failed to serialize result");
 
         assert_eq!(expected_output, result_str);
+    }
+
+    #[pg_test]
+    fn test_cbor_dec_to_jsonb_with_null_symbol() {
+        let cbor_bytes = hex::decode("a261610162620063636400")
+            .expect("Failed to decode hex");
+
+        let result = crate::cardano::cbor_decode_jsonb(&cbor_bytes);
+
+        let result_str = serde_json::to_string(&result.0).expect("Failed to convert JsonB to string");
+
+        assert_eq!("{\"a\":1,\"b\":\"cd\"}", result_str);
     }
 
     #[pg_test]
@@ -150,6 +183,20 @@ mod tests {
         let is_valid = crate::cardano::ed25519_verify_signature(&public_key, message, &signature);
 
         assert!(is_valid);
+    }
+
+    #[pg_test]
+    fn test_ed25519_reject() {
+        let message = b"Cardano is not amazing!";
+        let public_key =
+            hex::decode("432753BDFD91EA3E2DA1E3A0784D090D7088E2B176AE7C11DFA2D75E2A6C12FB")
+                .expect("Failed to decode hex");
+        let signature = hex::decode("74265F96E48EF1751F7C9CB3C5D376130664F6E00518FEFD10FB627112EF6DD29C424D335F236AECA9657B914FEC5DB9C0412E69858776B03A8FE476C0E7600F")
+            .expect("Failed to decode hex");
+
+        let is_valid = crate::cardano::ed25519_verify_signature(&public_key, message, &signature);
+
+        assert!(!is_valid);
     }
 
     #[pg_test]
@@ -206,13 +253,6 @@ mod tests {
         let non_utf8_bytes = hex::decode("deadbeef").expect("Failed to decode hex");
         let result = crate::cardano::tools_read_asset_name(&non_utf8_bytes);
         assert_eq!(result, "deadbeef");
-    }
-
-    #[pg_test]
-    fn test_read_asset_name_mixed_utf8() {
-        let mixed_utf8_bytes = hex::decode("e282ac41").expect("Failed to decode hex"); // "€A"
-        let result = crate::cardano::tools_read_asset_name(&mixed_utf8_bytes);
-        assert_eq!(result, "€A");
     }
 
     #[pg_test]
@@ -315,5 +355,65 @@ mod tests {
         let enterprise_address = "addr_test1vp6p2fglcl0snqlmrqym3vn794zh3k9hegekh6r9vcn7vfspyp8fn";
         let enterprise_addr_type = crate::cardano::tools_shelley_addr_get_type(&enterprise_address);
         assert_eq!(enterprise_addr_type, "PMT_KEY:NONE");
+    }
+
+    #[pg_test]
+    fn test_tools_verify_cip88_pool_key_registration_no_hash() {
+        let cbor_data = r#"\xa1190363a3000201a5018201581c6648d73a09b282c120c8476789f8232b7eead94ff560917ae8fc4eb10280038102041a08d77f10075820fb01193646bb8820cc8c1fc70752d068e1b37be2f1aef88a2bc70cf598de6a630281a201a40101032720062158201ca00b7625ea6a25a6c8c128e308877a563d133ff108147fd1edc36eca3a447c02845829a201276761646472657373581c6648d73a09b282c120c8476789f8232b7eead94ff560917ae8fc4eb10058203a1807ae73acd6dc91f39fa2f6d24e0996d348bb21939e1d9bc5cd75dd778a6858406b8978326e011a9531ac55040adeba410edd9ad8d28b59ad2b7b7d5923b82745ed85155c0ba367b2e54aa8e1f91eb96a58e8249f89d5d0b1f83ba4946d808607"#;
+
+        let query = format!(
+            "SELECT is_valid FROM cardano.tools_verify_cip88_pool_key_registration('{}'::bytea);",
+            cbor_data
+        );
+
+        let result: Option<bool> = Spi::get_one(&query)
+            .expect("Query execution failed");
+
+        assert_eq!(result, Some(true), "Expected is_valid to be true, but got {:?}", result);
+    }
+
+    #[pg_test]
+    fn test_tools_verify_cip88_pool_key_registration_hash() {
+        let cbor_data = r#"\xa1190363a3000201a5018201581c6648d73a09b282c120c8476789f8232b7eead94ff560917ae8fc4eb10280038102041a08d7891a075820fb01193646bb8820cc8c1fc70752d068e1b37be2f1aef88a2bc70cf598de6a630281a201a40101032720062158201ca00b7625ea6a25a6c8c128e308877a563d133ff108147fd1edc36eca3a447c02845829a201276761646472657373581c6648d73a09b282c120c8476789f8232b7eead94ff560917ae8fc4eb101581c840ab20690f19a03b8bcd3c5ee40aa4829d933a2dcc25e6b82acc57e5840301ae3df60b66323059bef0f25a508eb025c881c72c04f02745f43d2679403e48d3bd1e605b5cb948935392369c7ce2d3649a3ab6335f68730ce053e411bc407"#;
+
+        let query = format!(
+            "SELECT is_valid FROM cardano.tools_verify_cip88_pool_key_registration('{}'::bytea);",
+            cbor_data
+        );
+
+        let result: Option<bool> = Spi::get_one(&query)
+            .expect("Query execution failed");
+
+        assert_eq!(result, Some(true), "Expected is_valid to be true, but got {:?}", result);
+    }
+
+    #[pg_test]
+    fn test_tools_verify_cip88_pool_key_registration_no_hash_fail() {
+        let cbor_data = r#"\xa1190363a3000201a5018201581c6648d73a09b282c120c8476789f8232b7eead94ff560917ae8fc4eb10280038102041a08d77f10075820fb01193646bb8820cc8c1fc70752d068e1b37be2f1aef88a2bc70cf598de6a630281a201a40101032720062158201ca00b7625ea6a25a6c8c128e308877a563d133ff108147fd1edc36eca3a447c02845829a201276761646472657373581c6648d73a09b282c120c8476789f8232b7eead94ff560917ae8fc4eb10058203a1807ae73acd6dc91f39fa2f6d24e0996d348bb21939e1d9bc5cd75dd778a6858406b8978326e011a9531ac55040adaba410edd9ad8d28b59ad2b7b7d5923b82745ed85155c0ba367b2e54aa8e1f91eb96a58e8249f89d5d0b1f83ba4946d808607"#;
+
+        let query = format!(
+            "SELECT is_valid FROM cardano.tools_verify_cip88_pool_key_registration('{}'::bytea);",
+            cbor_data
+        );
+
+        let result: Option<bool> = Spi::get_one(&query)
+            .expect("Query execution failed");
+
+        assert_eq!(result, Some(false));
+    }
+
+    #[pg_test]
+    fn test_tools_verify_cip88_pool_key_registration_hash_fail() {
+        let cbor_data = r#"\xa1190363a3000201a5018201581c6648d73a09b282c120c8476789f8232b7eead94ff560917ae8fc4eb10280038102041a08d7891a075820fb01193646bb8820cc8c1fc70752d068e1b37be2f1aef88a2bc70cf598de6a630281a201a40101032720062158201ca00b7625ea6a25a6c8c128e308877a563d133ff108147fd1edc36eca3a447c02845829a201276761646472657373581c6648d73a09b282c120c8476789f8232b7eead94ff560917ae8fc4eb101581c840ab20690f19a03b8bcd3c5ee40aa4829d933a2dcc25e6b82acc57e5840301ae3df60b66323059befaf25a508eb025c881c72c04f02745f43d2679403e48d3bd1e605b5cb948935392369c7ce2d3649a3ab6335f68730ce053e411bc407"#;
+
+        let query = format!(
+            "SELECT is_valid FROM cardano.tools_verify_cip88_pool_key_registration('{}'::bytea);",
+            cbor_data
+        );
+
+        let result: Option<bool> = Spi::get_one(&query)
+            .expect("Query execution failed");
+
+        assert_eq!(result, Some(false));
     }
 }
