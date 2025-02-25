@@ -20,6 +20,15 @@ get_pg_config_value() {
   pg_config | grep "$key" | cut -d '=' -f 2 | xargs
 }
 
+# Description : Exit with error message
+#             : $1 = Error message we'd like to display before exiting (function will pre-fix 'ERROR: ' to the argument)
+err_exit() {
+  printf "${BOLD}${RED}ERROR: ${1} ${RESET}\n" >&2
+  echo -e "Exiting...\n" >&2
+  pushd -0 >/dev/null && dirs -c
+  exit 1
+}
+
 PG_VERSION=$(get_pg_config_value "VERSION" | awk '{print $2}' | cut -d'.' -f1)
 SHAREDIR=$(get_pg_config_value "SHAREDIR")
 PKGLIBDIR=$(get_pg_config_value "PKGLIBDIR")
@@ -41,10 +50,7 @@ if [ ! -d "$BIN_DIR" ]; then
   MIGRATIONS_DIR="$DIR/../pg_cardano/migrations"
 fi
 
-if [ ! -d "$BIN_DIR" ]; then
-  echo -e "${BOLD}${RED}Error: Directory with pre-built extension for PostgreSQL $PG_VERSION not found.${RESET}"
-  exit 1
-fi
+[ -d "$BIN_DIR" ] || err_exit "Directory with pre-built extension for PostgreSQL $PG_VERSION not found."
 
 echo -e "${BOLD}${GREEN}Found extension directory: $BIN_DIR${RESET}"
 
@@ -54,23 +60,11 @@ sudo mkdir -p "$SHAREDIR"
 sudo mkdir -p "$SHAREDIR/extension/"
 sudo mkdir -p "$PKGLIBDIR"
 
-sudo cp "$MIGRATIONS_DIR"/*.control "$SHAREDIR/extension/" 2>/dev/null
-if [ $? -ne 0 ]; then
-  echo -e "${BOLD}${RED}Error: Failed to copy control files to $SHAREDIR/extension.${RESET}"
-  exit 1
-fi
+sudo cp "$MIGRATIONS_DIR"/*.control "$SHAREDIR/extension/" 2>/dev/null || err_exit "Failed to copy control files to $SHAREDIR/extension."
 
-sudo cp "$MIGRATIONS_DIR"/*.sql "$SHAREDIR/extension/" 2>/dev/null
-if [ $? -ne 0 ]; then
-  echo -e "${BOLD}${RED}Error: Failed to copy SQL files to $SHAREDIR/extension.${RESET}"
-  exit 1
-fi
+sudo cp "$MIGRATIONS_DIR"/*.sql "$SHAREDIR/extension/" 2>/dev/null || err_exit "Failed to copy SQL files to $SHAREDIR/extension."
 
-sudo cp "$BIN_DIR"/*.so "$PKGLIBDIR/" 2>/dev/null
-if [ $? -ne 0 ]; then
-  echo -e "${BOLD}${RED}Error: Failed to copy .so files to $PKGLIBDIR.${RESET}"
-  exit 1
-fi
+sudo cp "$BIN_DIR"/*.so "$PKGLIBDIR/" 2>/dev/null || err_exit "Failed to copy .so files to $PKGLIBDIR."
 
 echo -e "${BOLD}${GREEN}========================================${RESET}"
 echo -e "${BOLD}${GREEN}EXTENSION PG_CARDANO IS READY TO USE!${RESET}"
@@ -84,5 +78,5 @@ echo -e "\n2) If the extension already exists, you can update it to the latest v
 echo -e "   ${BOLD}ALTER EXTENSION pg_cardano UPDATE;${RESET}"
 
 echo -e "\nFor more information, you can refer to the official documentation:"
-echo -e "   ${BLUE}https://github.com/Fell-x27/pg_cardano/blob/master/README.md${RESET}"
+echo -e "   ${BLUE}https://github.com/cardano-community/pg_cardano/blob/master/README.md${RESET}"
 

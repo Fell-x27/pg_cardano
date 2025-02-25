@@ -80,7 +80,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ## 2. Clone the Repository and install dependencies
 
 ```bash
-git clone https://github.com/Fell-x27/pg_cardano.git
+git clone https://github.com/cardano-community/pg_cardano.git
 cd pg_cardano
 cargo install cargo-pgrx
 cargo pgrx init
