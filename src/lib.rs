@@ -64,6 +64,13 @@ mod cardano {
     }
 
     #[pg_extern]
+    pub(crate) fn cbor_encode_jsonb_new(input: JsonB) -> Vec<u8> {
+        let value: JsonValue = serde_json::from_value(input.0).expect("Failed to parse JsonB");
+        let transformed = transform_json_new(value);
+        to_vec(&transformed).expect("Failed to encode CBOR")
+    }
+
+    #[pg_extern]
     pub fn cbor_decode_jsonb(
         cbor_bytes: &[u8],
     ) -> JsonB {
@@ -80,6 +87,16 @@ mod cardano {
             from_slice(cbor_bytes).expect("Failed to decode CBOR"), true
         ))
     }
+
+    #[pg_extern]
+    pub fn cbor_decode_jsonb_hex2bytea_new(
+        cbor_bytes: &[u8],
+    ) -> JsonB {
+        JsonB(cbor_to_json_new(
+            from_slice(cbor_bytes).expect("Failed to decode CBOR"), true
+        ))
+    }
+
 
     // Blake2B
     #[pg_extern]
@@ -282,6 +299,63 @@ mod cardano {
             _ => "UNKNOWN",
         };
         addr_type.to_string()
+    }
+
+    #[pg_extern]
+    pub fn tools_verify_cip88_pool_key_registration_native(cbor_data: &[u8]) -> bool {
+        let jsonb_data: JsonB = cbor_decode_jsonb_hex2bytea_new(cbor_data);
+        let json_data = &jsonb_data.0;
+
+        let protected_header: Vec<u8> = json_data
+            .pointer("/867/2/0/2/0")
+            .map(|v| cbor_encode_jsonb_new(JsonB(v.clone()))) // Добавлен clone()
+            .unwrap_or_default();
+
+        let payload: Vec<u8> = json_data
+            .pointer("/867/1")
+            .map(|v| cbor_encode_jsonb_new(JsonB(v.clone()))) // Добавлен clone()
+            .map(|v| blake2b_hash(&v, 32))
+            .unwrap_or_default();
+
+        let address = json_data
+            .pointer("/867/2/0/2/0/address")
+            .and_then(JsonValue::as_str)
+            .and_then(|s| hex::decode(s.strip_prefix("\\x").unwrap_or(s)).ok())
+            .unwrap_or_default();
+
+        let pubkey = json_data
+            .pointer("/867/2/0/1/-2")
+            .and_then(JsonValue::as_str)
+            .and_then(|s| hex::decode(s.strip_prefix("\\x").unwrap_or(s)).ok())
+            .unwrap_or_default();
+
+        let need_hash = json_data
+            .pointer("/867/2/0/2/1")
+            .and_then(JsonValue::as_i64)
+            .map(|v| v as i32)
+            .unwrap_or(0);
+
+        let signature = json_data
+            .pointer("/867/2/0/2/3")
+            .and_then(JsonValue::as_str)
+            .and_then(|s| hex::decode(s.strip_prefix("\\x").unwrap_or(s)).ok())
+            .unwrap_or_default();
+
+        let message_payload = if need_hash == 1 {
+            blake2b_hash(&payload, 28)
+        } else {
+            payload // Передаём без clone()
+        };
+
+        let message = cbor_encode_jsonb_new(JsonB(JsonValue::Array(vec![
+            JsonValue::String("Signature1".to_string()),
+            JsonValue::String(format!("\\x{}", hex::encode(&protected_header))),
+            JsonValue::String("\\x".to_string()),
+            JsonValue::String(format!("\\x{}", hex::encode(&message_payload))),
+        ])));
+
+        let expected_address = blake2b_hash(&pubkey, 28);
+        ed25519_verify_signature(&pubkey, &message, &signature) && address == expected_address
     }
 
 
