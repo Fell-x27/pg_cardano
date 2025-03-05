@@ -1,35 +1,30 @@
 use hex;
-use indexmap::IndexMap;
 use serde_cbor::{self, Value as CborValue};
 use serde_json::{Value as JsonValue};
-
-pub fn is_valid_hex(s: &str) -> bool {
-    s.len() > 2 && s.starts_with("\\x") && s[2..].chars().all(|c| c.is_digit(16))
-}
 
 pub fn transform_json(value: JsonValue) -> CborValue {
     match value {
         JsonValue::String(s) => {
-            if s.is_empty() || s == "\\x" || s == "0x" {
-                CborValue::Bytes(vec![])
-            } else if is_valid_hex(&s) {
-                let bytes = hex::decode(&s[2..]).expect("Invalid hex string");
-                CborValue::Bytes(bytes)
-            } else {
-                CborValue::Text(s)
+            if s.is_empty() || matches!(s.as_str(), "\\x" | "0x") {
+                return CborValue::Bytes(vec![]);
             }
+
+            if let Some(hex_str) = s.strip_prefix("0x").or_else(|| s.strip_prefix("\\x")) {
+                if hex_str.len() % 2 == 0 && hex_str.bytes().all(|b| b.is_ascii_hexdigit()) {
+                    return CborValue::Bytes(hex::decode(hex_str).expect("Invalid hex string"));
+                }
+            }
+
+            CborValue::Text(s)
         }
         JsonValue::Object(obj) => {
             let transformed_obj = obj
                 .into_iter()
-                .map(|(k, v)| {
-                    let key = if let Ok(num) = k.parse::<i64>() {
-                        CborValue::Integer(num as i128)
-                    } else {
-                        CborValue::Text(k)
-                    };
-                    (key, transform_json(v))
-                })
+                .map(|(k, v)| (
+                    k.parse::<i64>()
+                        .map_or_else(|_| CborValue::Text(k), |num| CborValue::Integer(num as i128)),
+                    transform_json(v)
+                ))
                 .collect();
             CborValue::Map(transformed_obj)
         }
@@ -38,7 +33,7 @@ pub fn transform_json(value: JsonValue) -> CborValue {
             if let Some(i) = n.as_i64() {
                 CborValue::Integer(i as i128)
             } else {
-                CborValue::Float(n.as_f64().unwrap())
+                CborValue::Float(n.as_f64().unwrap_or(0.0))
             }
         }
         JsonValue::Bool(b) => CborValue::Bool(b),
@@ -56,19 +51,17 @@ pub fn cbor_to_json(value: CborValue, with_byte_arrays: bool) -> JsonValue {
         }
         CborValue::Bytes(b) => {
             if let Ok(nested_cbor) = serde_cbor::from_slice::<CborValue>(&b) {
-                cbor_to_json(nested_cbor, with_byte_arrays)
-            } else {
-                let encoded = hex::encode(b);
-                JsonValue::String(if with_byte_arrays {
-                    format!("\\x{}", encoded)
-                } else {
-                    encoded
-                })
+                return cbor_to_json(nested_cbor, with_byte_arrays);
             }
+            let encoded = hex::encode(b);
+            JsonValue::String(if with_byte_arrays {
+                format!("\\x{}", encoded)
+            } else {
+                encoded
+            })
         }
         CborValue::Text(t) => {
-            let sanitized_text: String = t.chars().filter(|&c| c != '\u{0}').collect();
-            JsonValue::String(sanitized_text)
+            JsonValue::String(t.replace('\u{0}', ""))
         }
         CborValue::Array(arr) => JsonValue::Array(
             arr.into_iter()
@@ -76,10 +69,10 @@ pub fn cbor_to_json(value: CborValue, with_byte_arrays: bool) -> JsonValue {
                 .collect(),
         ),
         CborValue::Map(map) => {
-            let mut ordered_map = IndexMap::new();
+            let mut ordered_map = serde_json::Map::new();
             for (k, v) in map {
                 let key = match k {
-                    CborValue::Text(t) => t.chars().filter(|&c| c != '\u{0}').collect::<String>(),
+                    CborValue::Text(t) => t.replace('\u{0}', ""),
                     CborValue::Bytes(b) => {
                         let encoded = hex::encode(b);
                         if with_byte_arrays {
@@ -100,20 +93,17 @@ pub fn cbor_to_json(value: CborValue, with_byte_arrays: bool) -> JsonValue {
                 };
                 ordered_map.insert(key, cbor_to_json(v, with_byte_arrays));
             }
-            eprintln!(
-                "Ordered JSON object: {:?}",
-                ordered_map.keys().collect::<Vec<_>>()
-            );
-            JsonValue::Object(serde_json::Map::from_iter(ordered_map.into_iter()))
+            JsonValue::Object(ordered_map)
         }
-        _ => {
-            let encoded = hex::encode(serde_cbor::to_vec(&value).unwrap());
+        CborValue::Tag(tag, boxed) => {
+            let encoded = hex::encode(serde_cbor::to_vec(&CborValue::Tag(tag, boxed)).unwrap());
             JsonValue::String(if with_byte_arrays {
                 format!("\\x{}", encoded)
             } else {
                 encoded
             })
         }
+        _ => unreachable!(),
     }
 }
 
