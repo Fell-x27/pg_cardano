@@ -4,11 +4,12 @@ mod tests;
 use bech32::{self, decode, encode, Bech32, Hrp};
 use bs58;
 use hex;
-
+use std::collections::BTreeMap;
 use pgrx::prelude::*;
 use pgrx::*;
 
-use serde_cbor::{from_slice, to_vec};
+use serde::{Deserialize, Serialize};
+use serde_cbor::{from_slice, to_vec, Value as CborValue};
 use serde_json::{Value as JsonValue};
 
 use blake2::digest::{Update, VariableOutput};
@@ -63,12 +64,6 @@ mod cardano {
         to_vec(&transformed).expect("Failed to encode CBOR")
     }
 
-    #[pg_extern]
-    pub(crate) fn cbor_encode_jsonb_new(input: JsonB) -> Vec<u8> {
-        let value: JsonValue = serde_json::from_value(input.0).expect("Failed to parse JsonB");
-        let transformed = transform_json_new(value);
-        to_vec(&transformed).expect("Failed to encode CBOR")
-    }
 
     #[pg_extern]
     pub fn cbor_decode_jsonb(
@@ -87,16 +82,6 @@ mod cardano {
             from_slice(cbor_bytes).expect("Failed to decode CBOR"), true
         ))
     }
-
-    #[pg_extern]
-    pub fn cbor_decode_jsonb_hex2bytea_new(
-        cbor_bytes: &[u8],
-    ) -> JsonB {
-        JsonB(cbor_to_json_new(
-            from_slice(cbor_bytes).expect("Failed to decode CBOR"), true
-        ))
-    }
-
 
     // Blake2B
     #[pg_extern]
@@ -301,20 +286,23 @@ mod cardano {
         addr_type.to_string()
     }
 
+
+    //cip_88 tools
     #[pg_extern]
-    pub fn tools_verify_cip88_pool_key_registration_native(cbor_data: &[u8]) -> bool {
-        let jsonb_data: JsonB = cbor_decode_jsonb_hex2bytea_new(cbor_data);
+    pub(crate) fn tools_verify_cip88_pool_key_registration(cbor_data: &[u8]) -> bool {
+        let jsonb_data: JsonB = cbor_decode_jsonb_hex2bytea(cbor_data);
         let json_data = &jsonb_data.0;
 
-        let protected_header: Vec<u8> = json_data
-            .pointer("/867/2/0/2/0")
-            .map(|v| cbor_encode_jsonb_new(JsonB(v.clone()))) // Добавлен clone()
-            .unwrap_or_default();
 
         let payload: Vec<u8> = json_data
             .pointer("/867/1")
-            .map(|v| cbor_encode_jsonb_new(JsonB(v.clone()))) // Добавлен clone()
+            .map(|v| cbor_encode_jsonb(JsonB(v.clone())))
             .map(|v| blake2b_hash(&v, 32))
+            .unwrap_or_default();
+
+        let protected_header: Vec<u8> = json_data
+            .pointer("/867/2/0/2/0")
+            .map(|v| cbor_encode_jsonb(JsonB(v.clone())))
             .unwrap_or_default();
 
         let address = json_data
@@ -329,25 +317,25 @@ mod cardano {
             .and_then(|s| hex::decode(s.strip_prefix("\\x").unwrap_or(s)).ok())
             .unwrap_or_default();
 
-        let need_hash = json_data
-            .pointer("/867/2/0/2/1")
-            .and_then(JsonValue::as_i64)
-            .map(|v| v as i32)
-            .unwrap_or(0);
-
         let signature = json_data
             .pointer("/867/2/0/2/3")
             .and_then(JsonValue::as_str)
             .and_then(|s| hex::decode(s.strip_prefix("\\x").unwrap_or(s)).ok())
             .unwrap_or_default();
 
+        let need_hash = json_data
+            .pointer("/867/2/0/2/1")
+            .and_then(JsonValue::as_i64)
+            .map(|v| v as i32)
+            .unwrap_or(0);
+
         let message_payload = if need_hash == 1 {
             blake2b_hash(&payload, 28)
         } else {
-            payload // Передаём без clone()
+            payload
         };
 
-        let message = cbor_encode_jsonb_new(JsonB(JsonValue::Array(vec![
+        let message = cbor_encode_jsonb(JsonB(JsonValue::Array(vec![
             JsonValue::String("Signature1".to_string()),
             JsonValue::String(format!("\\x{}", hex::encode(&protected_header))),
             JsonValue::String("\\x".to_string()),
@@ -357,52 +345,6 @@ mod cardano {
         let expected_address = blake2b_hash(&pubkey, 28);
         ed25519_verify_signature(&pubkey, &message, &signature) && address == expected_address
     }
-
-
-    extension_sql!(
-r#"CREATE OR REPLACE FUNCTION cardano.tools_verify_cip88_pool_key_registration(cbor_data BYTEA)
-    RETURNS TABLE (is_valid BOOLEAN) AS $$
-BEGIN
-RETURN QUERY
-    WITH
-        decoded_jsonb AS (
-            SELECT "cardano"."cbor_decode_jsonb_hex2bytea"(cbor_data) AS json_data
-        ),
-        parsed_fields AS (
-            SELECT
-                "cardano"."cbor_encode_jsonb"(json_data#>'{867, 2, 0, 2, 0}') AS protected_header,
-                "cardano"."blake2b_hash"("cardano"."cbor_encode_jsonb"(json_data#>'{867, 1}'), 32) AS payload,
-                (json_data#>>'{867, 2, 0, 2, 0, address}')::"bytea" AS address,
-                (json_data#>>'{867, 2, 0, 1, -2}')::"bytea" AS pubkey,
-                (json_data#>>'{867, 2, 0, 2, 1}')::"int2" AS need_hash,
-                (json_data#>>'{867, 2, 0, 2, 3}')::"bytea" AS signature
-            FROM decoded_jsonb
-        )
-SELECT
-    cardano.ed25519_verify_signature(
-            pubkey,
-            message,
-            signature
-    ) AND ("address" = "expected_address") AS is_valid
-FROM parsed_fields, LATERAL (
-     SELECT
-         "cardano"."cbor_encode_jsonb"(
-                 jsonb_build_array(
-                         'Signature1',
-                         protected_header,
-                         ''::bytea,
-                         CASE
-                             WHEN need_hash = 1 THEN cardano.blake2b_hash(payload, 28)
-                             ELSE payload
-                             END
-                 )
-         ) AS message,
-         "cardano".blake2b_hash("pubkey", 28) AS expected_address
-    ) subquery;
-END;
-$$ LANGUAGE plpgsql;"#,
-    name = "tools_verify_cip88_pool_key_registration"
-);
 }
 
 
