@@ -14,9 +14,16 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        os: [debian, archlinux, rockylinux:9]
+        os: [debian, archlinux, centos-8]
+        include:
+          - os: debian
+            image: debian:latest
+          - os: archlinux
+            image: archlinux:latest
+          - os: centos-8
+            image: centos:8
     container:
-      image: ${{ matrix.os }}:latest
+      image: ${{ matrix.image }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -30,7 +37,7 @@ jobs:
             archlinux)
               pacman -Syu --noconfirm clang git curl base-devel readline zlib flex bison libxml2 libxslt openssl ccache pkgconf
               ;;
-            rockylinux)
+            centos)
               yum makecache && yum install -y epel-release && yum makecache
               yum install -y clang clang-devel git curl bison-devel readline-devel zlib-devel openssl-devel wget ccache && yum groupinstall -y 'Development Tools'
               ;;
