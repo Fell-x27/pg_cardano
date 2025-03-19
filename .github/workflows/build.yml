@@ -42,31 +42,23 @@ jobs:
         run: |
           cargo pgrx init
 
-      - name: Build extension
-        run: |
-          cargo build
-
-      - name: Run tests
-        run: |
-          cargo test --package pg_cardano --lib tests
-
       - name: Build distribution
         run: |
           chmod +x ./scripts/build.sh
           ./scripts/build.sh
 
+      - name: Run tests
+        run: |
+          cargo test --package pg_cardano --lib tests
+
       - name: Create release artifact
         run: |
           chmod +x ./scripts/release.sh
           ./scripts/release.sh
-
-      - name: Extract version from Cargo.toml
-        id: get_version
-        run: |
           echo "VERSION=$(grep '^version =' Cargo.toml | cut -d '"' -f 2)" >> $GITHUB_ENV
 
       - name: Upload artifact for release
         uses: actions/upload-artifact@v4
         with:
           name: pg_cardano_linux_x86_64_v${{ env.VERSION }}
-          path: ./dist/*
+          path: ./releases/*.tar.gz
