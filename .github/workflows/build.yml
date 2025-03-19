@@ -49,7 +49,7 @@ jobs:
               dnf install -y clang clang-devel git curl bison readline-devel zlib-devel openssl-devel wget ccache libicu-devel && dnf groupinstall -y 'Development Tools'
               ;;
             macos-*)
-              brew install llvm git curl readline bison flex zlib openssl ccache icu4c pkg-config gettext
+              brew install llvm git curl readline bison flex zlib openssl ccache icu4c pkg-config gettext libiconv
               export PKG_CONFIG_PATH=$(brew --prefix icu4c)/lib/pkgconfig:$(brew --prefix gettext)/lib/pkgconfig:$PKG_CONFIG_PATH
               export LDFLAGS="-L$(brew --prefix icu4c)/lib"
               export CPPFLAGS="-I$(brew --prefix icu4c)/include" && export PKG_CONFIG_PATH=$(brew --prefix icu4c)/lib/pkgconfig:$PKG_CONFIG_PATH
