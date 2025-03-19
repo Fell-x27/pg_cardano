@@ -14,15 +14,27 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest]
+        os: [ubuntu-latest, archlinux, rockylinux-8]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install dependencies
+      - name: Install dependencies (Debian-based)
+        if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt update
           sudo apt install -y libclang-dev clang git curl build-essential libreadline-dev zlib1g-dev flex bison libxml2-dev libxslt-dev libssl-dev libxml2-utils xsltproc ccache pkg-config
+
+      - name: Install dependencies (Arch-based)
+        if: matrix.os == 'archlinux'
+        run: |
+          sudo pacman -Syu --noconfirm clang git curl base-devel readline zlib flex bison libxml2 libxslt openssl ccache pkgconf
+
+      - name: Install dependencies (RHEL-based)
+        if: matrix.os == 'rockylinux-8'
+        run: |
+          sudo yum makecache
+          sudo yum install -y clang clang-devel git curl bison-devel readline-devel zlib-devel openssl-devel wget ccache && sudo yum groupinstall -y 'Development Tools'
 
       - name: Install Rust
         run: |
@@ -60,5 +72,5 @@ jobs:
       - name: Upload artifact for release
         uses: actions/upload-artifact@v4
         with:
-          name: pg_cardano_linux_x86_64_v${{ env.VERSION }}
+          name: pg_cardano_${{ matrix.os }}_x86_64_v${{ env.VERSION }}
           path: ./releases/*.tar.gz
