@@ -29,6 +29,20 @@ jobs:
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
           echo "PATH=$HOME/.cargo/bin:$PATH" >> $GITHUB_ENV
 
+      - name: Install specific version of cargo-edit
+        run: |
+          cargo install --force --version 0.12.3 cargo-edit
+
+      - name: Install cargo-pgrx with isolated environment
+        run: |
+          export CARGO_INSTALL_ROOT=$HOME/.cargo-pgrx
+          cargo install --version 0.13.1 cargo-pgrx
+          echo "PATH=$HOME/.cargo-pgrx/bin:$PATH" >> $GITHUB_ENV
+
+      - name: Remove cargo-edit after installing cargo-pgrx
+        run: |
+          cargo uninstall cargo-edit
+
       - name: Ensure Cargo.lock exists
         run: |
           if [ ! -f Cargo.lock ]; then cargo generate-lockfile; fi
@@ -45,7 +59,7 @@ jobs:
 
       - name: Initialize cargo-pgrx
         run: |
-          cargo pgrx init
+          cargo pgrx init --pg-config none
 
       - name: Verify PGRX installation
         run: |
