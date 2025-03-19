@@ -29,9 +29,13 @@ jobs:
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
-      - name: Install dependencies from Cargo.toml
+      - name: Install cargo tools
         run: |
-          cargo install --path .
+          cargo install cargo-edit cargo-pgrx
+
+      - name: Fetch dependencies
+        run: |
+          cargo fetch
 
       - name: Initialize cargo-pgrx
         run: |
