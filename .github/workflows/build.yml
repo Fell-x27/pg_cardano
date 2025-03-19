@@ -44,11 +44,11 @@ jobs:
 
       - name: Build extension
         run: |
-          cargo pgrx package
+          cargo build
 
       - name: Run tests
         run: |
-          cargo test --package pg_cardano --lib
+          cargo test --package pg_cardano --lib tests
 
       - name: Build distribution
         run: |
