@@ -14,14 +14,14 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        os: [debian, archlinux, centos-8]
+        os: [debian, arch, rhel]
         include:
           - os: debian
             image: debian:latest
-          - os: archlinux
+          - os: arch
             image: archlinux:latest
-          - os: centos-8
-            image: centos:8
+          - os: rhel
+            image: almalinux:8
     container:
       image: ${{ matrix.image }}
     steps:
@@ -34,11 +34,11 @@ jobs:
             debian)
               apt update && apt install -y libclang-dev clang git curl build-essential libreadline-dev zlib1g-dev flex bison libxml2-dev libxslt-dev libssl-dev libxml2-utils xsltproc ccache pkg-config
               ;;
-            archlinux)
+            arch)
               pacman -Syu --noconfirm clang git curl base-devel readline zlib flex bison libxml2 libxslt openssl ccache pkgconf
               ;;
-            centos-8)
-              yum makecache && yum install -y epel-release && yum makecache
+            rhel)
+              dnf makecache && yum install -y epel-release && yum makecache
               yum install -y clang clang-devel git curl bison-devel readline-devel zlib-devel openssl-devel wget ccache && yum groupinstall -y 'Development Tools'
               ;;
           esac
