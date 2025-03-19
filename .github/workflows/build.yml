@@ -38,6 +38,11 @@ jobs:
           cargo fetch
           cargo build --locked --release --workspace
 
+      - name: Set up PGRX environment
+        run: |
+          echo "PGRX_HOME=$HOME/.pgrx" >> $GITHUB_ENV
+          mkdir -p $HOME/.pgrx
+
       - name: Initialize cargo-pgrx
         run: |
           cargo pgrx init
