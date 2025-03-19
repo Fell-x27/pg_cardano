@@ -1,0 +1,69 @@
+name: Build and Test pg_cardano
+
+on:
+  push:
+    branches:
+      - "*"
+  pull_request:
+    branches:
+      - "*"
+
+jobs:
+  build:
+    name: Build and Test on ${{ matrix.os }} (${{ matrix.arch }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        arch: [x86_64, aarch64]
+    env:
+      CARGO_BUILD_TARGET: ${{ matrix.arch }}-unknown-linux-gnu
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y libclang-dev clang git curl build-essential libreadline-dev zlib1g-dev flex bison libxml2-dev libxslt-dev libssl-dev libxml2-utils xsltproc ccache pkg-config
+
+      - name: Install Rust
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      - name: Install cargo-pgrx
+        run: |
+          cargo install cargo-pgrx
+          cargo pgrx init
+
+      - name: Build extension
+        run: |
+          cargo pgrx package --target $CARGO_BUILD_TARGET
+
+      - name: Run tests
+        run: |
+          cargo test --package pg_cardano --lib --target $CARGO_BUILD_TARGET
+
+      - name: Build distribution
+        run: |
+          chmod +x ./scripts/build.sh
+          ./scripts/build.sh
+
+      - name: Create release artifact
+        run: |
+          chmod +x ./scripts/release.sh
+          ./scripts/release.sh
+
+      - name: Extract version from Cargo.toml
+        id: get_version
+        run: |
+          echo "VERSION=$(grep '^version =' Cargo.toml | cut -d '"' -f 2)" >> $GITHUB_ENV
+
+      - name: Upload artifact for release
+        uses: actions/upload-artifact@v4
+        with:
+          name: pg_cardano_linux_${{ matrix.arch }}_v${{ env.VERSION }}
+          path: ./dist/*
+

@@ -4,13 +4,13 @@ mod tests;
 use bech32::{self, decode, encode, Bech32, Hrp};
 use bs58;
 use hex;
-use std::collections::BTreeMap;
 use pgrx::prelude::*;
 use pgrx::*;
+use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 use serde_cbor::{from_slice, to_vec, Value as CborValue};
-use serde_json::{Value as JsonValue};
+use serde_json::Value as JsonValue;
 
 use blake2::digest::{Update, VariableOutput};
 use blake2::Blake2bVar;
@@ -22,7 +22,6 @@ pg_module_magic!();
 
 #[pg_schema]
 mod cardano {
-
     use super::*;
     //Base58
     #[pg_extern]
@@ -70,7 +69,7 @@ mod cardano {
         cbor_bytes: &[u8],
     ) -> JsonB {
         JsonB(cbor_to_json(
-            from_slice(cbor_bytes).expect("Failed to decode CBOR"), false
+            from_slice(cbor_bytes).expect("Failed to decode CBOR"), false,
         ))
     }
 
@@ -79,7 +78,7 @@ mod cardano {
         cbor_bytes: &[u8],
     ) -> JsonB {
         JsonB(cbor_to_json(
-            from_slice(cbor_bytes).expect("Failed to decode CBOR"), true
+            from_slice(cbor_bytes).expect("Failed to decode CBOR"), true,
         ))
     }
 
@@ -125,7 +124,7 @@ mod cardano {
                 .try_into()
                 .expect("Invalid public key length"),
         )
-        .expect("Invalid public key");
+            .expect("Invalid public key");
         let signature = Signature::try_from(&signature_bytes[..]).expect("Invalid signature");
         verifying_key.verify(message, &signature).is_ok()
     }
@@ -286,6 +285,15 @@ mod cardano {
         addr_type.to_string()
     }
 
+    //cip-5 converter
+    #[pg_extern]
+    pub(crate) fn raw2text(raw_view: &[u8]) -> String {
+        "Test".to_string()
+    }
+
+    pub(crate) fn text2raw(text_view: &str) -> Vec<u8> {
+        [1, 2, 3].to_vec()
+    }
 
     //cip_88 tools
     #[pg_extern]
@@ -346,7 +354,6 @@ mod cardano {
         ed25519_verify_signature(&pubkey, &message, &signature) && address == expected_address
     }
 }
-
 
 
 ////////////////////// TESTS ///////////////////////////
