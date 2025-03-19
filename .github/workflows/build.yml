@@ -29,41 +29,18 @@ jobs:
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
           echo "PATH=$HOME/.cargo/bin:$PATH" >> $GITHUB_ENV
 
-      - name: Install specific version of cargo-edit
+      - name: Clone pg_cardano repository
         run: |
-          cargo install --force --version 0.12.3 cargo-edit
+          git clone https://github.com/cardano-community/pg_cardano.git
+          cd pg_cardano
 
-      - name: Install cargo-pgrx with isolated environment
+      - name: Install specific version of cargo-pgrx
         run: |
-          export CARGO_INSTALL_ROOT=$HOME/.cargo-pgrx
-          cargo install --version 0.13.1 cargo-pgrx
-          echo "PATH=$HOME/.cargo-pgrx/bin:$PATH" >> $GITHUB_ENV
-
-      - name: Remove cargo-edit after installing cargo-pgrx
-        run: |
-          cargo uninstall cargo-edit
-
-      - name: Ensure Cargo.lock exists
-        run: |
-          if [ ! -f Cargo.lock ]; then cargo generate-lockfile; fi
-
-      - name: Fetch dependencies and build
-        run: |
-          cargo fetch
-          cargo build --locked --release --workspace
-
-      - name: Set up PGRX environment
-        run: |
-          echo "PGRX_HOME=$HOME/.pgrx" >> $GITHUB_ENV
-          mkdir -p $HOME/.pgrx
+          cargo install --version 0.12.9 cargo-pgrx
 
       - name: Initialize cargo-pgrx
         run: |
-          cargo pgrx init --pg-config none
-
-      - name: Verify PGRX installation
-        run: |
-          ls -la $HOME/.pgrx
+          cargo pgrx init
 
       - name: Build extension
         run: |
