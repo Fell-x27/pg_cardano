@@ -33,6 +33,10 @@ jobs:
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
+      - name: Add Rust target
+        run: |
+          rustup target add $CARGO_BUILD_TARGET
+
       - name: Install cargo-pgrx
         run: |
           cargo install cargo-pgrx
@@ -66,4 +70,3 @@ jobs:
         with:
           name: pg_cardano_linux_${{ matrix.arch }}_v${{ env.VERSION }}
           path: ./dist/*
-
