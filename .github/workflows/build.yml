@@ -38,8 +38,8 @@ jobs:
               pacman -Syu --noconfirm clang git curl base-devel readline zlib flex bison libxml2 libxslt openssl ccache pkgconf
               ;;
             rhel)
-              dnf makecache && yum install -y epel-release && yum makecache
-              yum install -y clang clang-devel git curl bison-devel readline-devel zlib-devel openssl-devel wget ccache && yum groupinstall -y 'Development Tools'
+              dnf makecache && dnf install -y epel-release && dnf makecache
+              dnf install -y clang clang-devel git curl bison readline-devel zlib-devel openssl-devel wget ccache && dnf groupinstall -y 'Development Tools'
               ;;
           esac
 
