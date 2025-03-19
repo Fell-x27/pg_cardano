@@ -28,6 +28,7 @@ jobs:
         run: |
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          echo "source \"$HOME/.cargo/env\"" >> $GITHUB_ENV
 
       - name: Ensure Cargo.lock exists
         run: |
@@ -35,6 +36,7 @@ jobs:
 
       - name: Fetch dependencies and build
         run: |
+          source "$HOME/.cargo/env"
           cargo fetch
           cargo build --locked --release --workspace
 
@@ -45,6 +47,7 @@ jobs:
 
       - name: Initialize cargo-pgrx
         run: |
+          source "$HOME/.cargo/env"
           cargo pgrx init
 
       - name: Verify PGRX installation
@@ -53,10 +56,12 @@ jobs:
 
       - name: Build extension
         run: |
+          source "$HOME/.cargo/env"
           cargo pgrx package
 
       - name: Run tests
         run: |
+          source "$HOME/.cargo/env"
           cargo test --package pg_cardano --lib
 
       - name: Build distribution
