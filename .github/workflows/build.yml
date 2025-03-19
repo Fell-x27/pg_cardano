@@ -55,8 +55,6 @@ jobs:
               export CPPFLAGS="-I$(brew --prefix icu4c)/include"
               export PKG_CONFIG_PATH="$(brew --prefix)/opt/icu4c/lib/pkgconfig"
               export CMAKE_PREFIX_PATH=/usr/local/opt/icu4c
-              echo "DEBUG BEAM"
-              pkg-config --modversion icu-uc
               ;;
           esac
 
@@ -85,7 +83,12 @@ jobs:
 
       - name: Run tests
         run: |
-          cargo test --package pg_cardano --lib tests
+          if [ "${{ matrix.os }}" == "rhel" ]; then
+            export TMPDIR=/tmp
+            cargo test --package pg_cardano --lib tests -- --test-threads=1
+          else
+            cargo test --package pg_cardano --lib tests
+          fi
 
       - name: Create release artifact
         run: |
