@@ -29,11 +29,25 @@ jobs:
           sudo apt update
           sudo apt install -y libclang-dev clang git curl build-essential libreadline-dev zlib1g-dev flex bison libxml2-dev libxslt-dev libssl-dev libxml2-utils xsltproc ccache pkg-config
 
-      - name: Install dependencies (aarch64 via Docker)
+      - name: Fix containerd conflict (aarch64)
+        if: matrix.arch == 'aarch64'
+        run: |
+          sudo apt remove -y containerd.io || true
+          sudo apt-mark unhold containerd || true
+          sudo apt remove -y containerd || true
+
+      - name: Install Docker (aarch64)
         if: matrix.arch == 'aarch64'
         run: |
           sudo apt update
-          sudo apt install -y docker.io
+          sudo apt install -y ca-certificates curl gnupg
+          sudo install -m 0755 -d /etc/apt/keyrings
+          curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo tee /etc/apt/keyrings/docker.asc > /dev/null
+          sudo chmod a+r /etc/apt/keyrings/docker.asc
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+          sudo apt update
+          sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+          sudo usermod -aG docker $USER
 
       - name: Install Rust (x86_64)
         if: matrix.arch == 'x86_64'
