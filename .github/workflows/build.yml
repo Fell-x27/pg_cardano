@@ -26,7 +26,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt update
-          sudo apt install -y libclang-dev clang git curl build-essential libreadline-dev zlib1g-dev flex bison libxml2-dev libxslt-dev libssl-dev libxml2-utils xsltproc ccache pkg-config gcc-aarch64-linux-gnu
+          sudo apt install -y libclang-dev clang git curl build-essential libreadline-dev zlib1g-dev flex bison libxml2-dev libxslt-dev libssl-dev libxml2-utils xsltproc ccache pkg-config gcc-aarch64-linux-gnu libssl-dev pkg-config
 
       - name: Install Rust
         run: |
@@ -36,6 +36,12 @@ jobs:
       - name: Add Rust target
         run: |
           rustup target add $CARGO_BUILD_TARGET
+
+      - name: Set OpenSSL environment variables
+        run: |
+          echo "OPENSSL_DIR=$(pkg-config --variable=prefix openssl)" >> $GITHUB_ENV
+          echo "OPENSSL_LIB_DIR=$(pkg-config --variable=libdir openssl)" >> $GITHUB_ENV
+          echo "OPENSSL_INCLUDE_DIR=$(pkg-config --variable=includedir openssl)" >> $GITHUB_ENV
 
       - name: Install cargo-pgrx
         run: |
