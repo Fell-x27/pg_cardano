@@ -23,46 +23,56 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install dependencies
+      - name: Install dependencies (x86_64)
+        if: matrix.arch == 'x86_64'
         run: |
           sudo apt update
-          sudo apt install -y libclang-dev clang git curl build-essential libreadline-dev zlib1g-dev flex bison libxml2-dev libxslt-dev libssl-dev libxml2-utils xsltproc ccache pkg-config gcc-aarch64-linux-gnu libssl-dev pkg-config
+          sudo apt install -y libclang-dev clang git curl build-essential libreadline-dev zlib1g-dev flex bison libxml2-dev libxslt-dev libssl-dev libxml2-utils xsltproc ccache pkg-config
 
-      - name: Install Rust
+      - name: Install dependencies (aarch64 via Docker)
+        if: matrix.arch == 'aarch64'
+        run: |
+          sudo apt update
+          sudo apt install -y docker.io
+
+      - name: Install Rust (x86_64)
+        if: matrix.arch == 'x86_64'
         run: |
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
-      - name: Add Rust target
+      - name: Add Rust target (x86_64)
+        if: matrix.arch == 'x86_64'
         run: |
           rustup target add $CARGO_BUILD_TARGET
 
-      - name: Set OpenSSL environment variables
+      - name: Build in Docker for aarch64
+        if: matrix.arch == 'aarch64'
         run: |
-          echo "OPENSSL_DIR=$(pkg-config --variable=prefix openssl)" >> $GITHUB_ENV
-          echo "OPENSSL_LIB_DIR=$(pkg-config --variable=libdir openssl)" >> $GITHUB_ENV
-          echo "OPENSSL_INCLUDE_DIR=$(pkg-config --variable=includedir openssl)" >> $GITHUB_ENV
+          docker run --rm --platform=linux/arm64 \
+            -v "$(pwd)":/workspace \
+            -w /workspace \
+            rust:latest /bin/bash -c " \
+              apt update && apt install -y libclang-dev clang git curl build-essential libreadline-dev zlib1g-dev flex bison libxml2-dev libxslt-dev libssl-dev libxml2-utils xsltproc ccache pkg-config && \
+              curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && \
+              source $HOME/.cargo/env && \
+              cargo install cargo-pgrx && \
+              cargo pgrx init && \
+              cargo pgrx package --target aarch64-unknown-linux-gnu && \
+              chmod +x ./scripts/build.sh && \
+              ./scripts/build.sh && \
+              chmod +x ./scripts/release.sh && \
+              ./scripts/release.sh"
 
-      - name: Install cargo-pgrx
+      - name: Build and Test (x86_64)
+        if: matrix.arch == 'x86_64'
         run: |
           cargo install cargo-pgrx
           cargo pgrx init
-
-      - name: Build extension
-        run: |
-          cargo pgrx package --target $CARGO_BUILD_TARGET
-
-      - name: Run tests
-        run: |
-          cargo test --package pg_cardano --lib --target $CARGO_BUILD_TARGET
-
-      - name: Build distribution
-        run: |
+          cargo pgrx package
+          cargo test --package pg_cardano --lib
           chmod +x ./scripts/build.sh
           ./scripts/build.sh
-
-      - name: Create release artifact
-        run: |
           chmod +x ./scripts/release.sh
           ./scripts/release.sh
 
