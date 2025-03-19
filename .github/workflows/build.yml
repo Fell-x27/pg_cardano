@@ -37,7 +37,7 @@ jobs:
             archlinux)
               pacman -Syu --noconfirm clang git curl base-devel readline zlib flex bison libxml2 libxslt openssl ccache pkgconf
               ;;
-            centos)
+            centos-8)
               yum makecache && yum install -y epel-release && yum makecache
               yum install -y clang clang-devel git curl bison-devel readline-devel zlib-devel openssl-devel wget ccache && yum groupinstall -y 'Development Tools'
               ;;
