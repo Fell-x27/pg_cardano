@@ -11,32 +11,30 @@ on:
 jobs:
   build:
     name: Build and Test on ${{ matrix.os }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu, archlinux, rockylinux]
-    container:
-      image: ${{ matrix.os == 'archlinux' && 'archlinux:latest' || matrix.os == 'rockylinux' && 'rockylinux:8' || 'ubuntu:latest' }}
+        os: [ubuntu-latest, archlinux, rockylinux-8]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Install dependencies (Debian-based)
-        if: matrix.os == 'ubuntu'
+        if: matrix.os == 'ubuntu-latest'
         run: |
-          apt update
-          apt install -y libclang-dev clang git curl build-essential libreadline-dev zlib1g-dev flex bison libxml2-dev libxslt-dev libssl-dev libxml2-utils xsltproc ccache pkg-config
+          sudo apt update
+          sudo apt install -y libclang-dev clang git curl build-essential libreadline-dev zlib1g-dev flex bison libxml2-dev libxslt-dev libssl-dev libxml2-utils xsltproc ccache pkg-config
 
       - name: Install dependencies (Arch-based)
         if: matrix.os == 'archlinux'
         run: |
-          pacman -Syu --noconfirm clang git curl base-devel readline zlib flex bison libxml2 libxslt openssl ccache pkgconf
+          sudo pacman -Syu --noconfirm clang git curl base-devel readline zlib flex bison libxml2 libxslt openssl ccache pkgconf
 
       - name: Install dependencies (RHEL-based)
-        if: matrix.os == 'rockylinux'
+        if: matrix.os == 'rockylinux-8'
         run: |
-          yum makecache
-          yum install -y clang clang-devel git curl bison-devel readline-devel zlib-devel openssl-devel wget ccache && yum groupinstall -y 'Development Tools'
+          sudo yum makecache
+          sudo yum install -y clang clang-devel git curl bison-devel readline-devel zlib-devel openssl-devel wget ccache && sudo yum groupinstall -y 'Development Tools'
 
       - name: Install Rust
         run: |
@@ -69,25 +67,10 @@ jobs:
         run: |
           chmod +x ./scripts/release.sh
           ./scripts/release.sh
-          echo "VERSION=$(grep '^version =' Cargo.toml | cut -d '\"' -f 2)" >> $GITHUB_ENV
+          echo "VERSION=$(grep '^version =' Cargo.toml | cut -d '"' -f 2)" >> $GITHUB_ENV
 
       - name: Upload artifact for release
         uses: actions/upload-artifact@v4
         with:
           name: pg_cardano_${{ matrix.os }}_x86_64_v${{ env.VERSION }}
           path: ./releases/*.tar.gz
-
-      - name: Create GitHub Release (if not exists)
-        run: |
-          gh release create ${{ env.VERSION }} \
-            --title "Release ${{ env.VERSION }}" \
-            --notes-file release_notes.md \
-            --draft
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload artifact to GitHub Release
-        run: |
-          gh release upload ${{ env.VERSION }} ./releases/*.tar.gz --repo ${{ github.repository }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
