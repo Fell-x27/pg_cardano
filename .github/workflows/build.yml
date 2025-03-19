@@ -29,7 +29,7 @@ jobs:
             pacman -Syu --noconfirm clang git curl base-devel readline zlib flex bison libxml2 libxslt openssl ccache pkgconf
           elif [ "${{ matrix.os }}" == "rockylinux" ]; then
             yum makecache && yum install -y epel-release && yum makecache
-            yum install -y clang clang-devel git curl bison readline-devel zlib-devel openssl-devel wget ccache && yum groupinstall -y 'Development Tools'
+            yum install -y clang clang-devel git curl bison-devel readline-devel zlib-devel openssl-devel wget ccache && yum groupinstall -y 'Development Tools'
           fi
 
       - name: Install Rust
