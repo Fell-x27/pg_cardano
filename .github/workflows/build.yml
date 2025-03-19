@@ -11,17 +11,24 @@ on:
 jobs:
   build:
     name: Build and Test on ${{ matrix.os }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
-        os: [debian, arch, rhel]
+        os: [debian, arch, rhel, macos-x86_64, macos-arm64]
         include:
           - os: debian
             image: debian:latest
+            runner: ubuntu-latest
           - os: arch
             image: archlinux:latest
+            runner: ubuntu-latest
           - os: rhel
             image: almalinux:8
+            runner: ubuntu-latest
+          - os: macos-x86_64
+            runner: macos-12
+          - os: macos-arm64
+            runner: macos-14
     container:
       image: ${{ matrix.image }}
     steps:
@@ -39,7 +46,10 @@ jobs:
               ;;
             rhel)
               dnf makecache && dnf install -y epel-release && dnf makecache
-              dnf install -y clang clang-devel git curl bison readline-devel zlib-devel openssl-devel wget ccache && dnf groupinstall -y 'Development Tools'
+              dnf install -y clang clang-devel git curl bison readline-devel zlib-devel openssl-devel wget ccache libicu-devel && dnf groupinstall -y 'Development Tools'
+              ;;
+            macos-*)
+              brew install llvm git curl readline bison flex zlib openssl ccache icu4c pkg-config
               ;;
           esac
 
