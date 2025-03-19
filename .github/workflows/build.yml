@@ -11,30 +11,26 @@ on:
 jobs:
   build:
     name: Build and Test on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     strategy:
       matrix:
-        os: [ubuntu-latest, archlinux, rockylinux-8]
+        os: [debian, archlinux, rockylinux]
+    container:
+      image: ${{ matrix.os }}:latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install dependencies (Debian-based)
-        if: matrix.os == 'ubuntu-latest'
+      - name: Install dependencies
         run: |
-          sudo apt update
-          sudo apt install -y libclang-dev clang git curl build-essential libreadline-dev zlib1g-dev flex bison libxml2-dev libxslt-dev libssl-dev libxml2-utils xsltproc ccache pkg-config
-
-      - name: Install dependencies (Arch-based)
-        if: matrix.os == 'archlinux'
-        run: |
-          sudo pacman -Syu --noconfirm clang git curl base-devel readline zlib flex bison libxml2 libxslt openssl ccache pkgconf
-
-      - name: Install dependencies (RHEL-based)
-        if: matrix.os == 'rockylinux-8'
-        run: |
-          sudo yum makecache
-          sudo yum install -y clang clang-devel git curl bison-devel readline-devel zlib-devel openssl-devel wget ccache && sudo yum groupinstall -y 'Development Tools'
+          if [ "${{ matrix.os }}" == "debian" ]; then
+            apt update && apt install -y libclang-dev clang git curl build-essential libreadline-dev zlib1g-dev flex bison libxml2-dev libxslt-dev libssl-dev libxml2-utils xsltproc ccache pkg-config
+          elif [ "${{ matrix.os }}" == "archlinux" ]; then
+            pacman -Syu --noconfirm clang git curl base-devel readline zlib flex bison libxml2 libxslt openssl ccache pkgconf
+          elif [ "${{ matrix.os }}" == "rockylinux" ]; then
+            yum makecache && yum install -y epel-release && yum makecache
+            yum install -y clang clang-devel git curl bison readline-devel zlib-devel openssl-devel wget ccache && yum groupinstall -y 'Development Tools'
+          fi
 
       - name: Install Rust
         run: |
