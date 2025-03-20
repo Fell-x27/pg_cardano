@@ -51,8 +51,7 @@ jobs:
       - name: Install Rust
         run: |
           if [[ "${{ matrix.os }}" == "rhel" ]]; then
-            id -u test &>/dev/null || useradd -m test
-            useradd -m test
+            id -u test &>/dev/null || id -u test &>/dev/null || useradd -m test
             chown -R test:test /home/test
             cd ~
           fi
