@@ -74,7 +74,7 @@ jobs:
       - name: Run tests
         run: |
           if [[ "${{ matrix.os }}" == "rhel" ]]; then
-            sudo -u test cargo test --package pg_cardano --lib tests
+            su - test -c "cargo test --package pg_cardano --lib tests"
           else
             cargo test --package pg_cardano --lib tests
           fi
