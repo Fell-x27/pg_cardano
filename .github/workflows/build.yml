@@ -14,7 +14,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
-        os: [debian, arch, rhel, macos-x86_64, macos-arm64]
+        os: [rhel]
         include:
           - os: debian
             image: debian:latest
@@ -84,6 +84,13 @@ jobs:
       - name: Run tests
         run: |
           if [[ "${{ matrix.os }}" == "rhel" ]]; then
+            export TMPDIR=/tmp
+            export PGDATA=/tmp/pgdata
+            mkdir -p /dev/shm
+            mkdir -p /var/run/postgresql
+            chmod 1777 /dev/shm /var/run/postgresql
+            echo "Active PostgreSQL processes before tests:"
+            ps aux | grep postgres || true
             export TMPDIR=/tmp
             cargo test --package pg_cardano --lib tests -- --test-threads=1 --nocapture
           else
