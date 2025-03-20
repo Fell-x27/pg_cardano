@@ -31,9 +31,6 @@ jobs:
             runner: macos-latest
     container:
       image: ${{ matrix.image }}
-      options: --user test
-      env:
-        HOME: /home/test
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -42,6 +39,12 @@ jobs:
         run: |
           if [[ "${{ matrix.os }}" == "rhel" || "${{ matrix.os }}" == "debian" || "${{ matrix.os }}" == "arch" ]]; then
             id -u test &>/dev/null || useradd -m test
+          fi
+
+      - name: Switch to test user
+        run: |
+          if [[ "${{ matrix.os }}" == "rhel" || "${{ matrix.os }}" == "debian" || "${{ matrix.os }}" == "arch" ]]; then
+            su - test -c "bash -c 'exec "$0" "$@"' -- "$SHELL""
           fi
 
       - name: Install dependencies
