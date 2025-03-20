@@ -29,17 +29,17 @@ jobs:
         run: |
           case "${{ matrix.os }}" in
             debian)
-              apt update && apt install -y libclang-dev clang git curl build-essential libreadline-dev zlib1g-dev flex bison libxml2-dev libxslt-dev libssl-dev libxml2-utils xsltproc ccache pkg-config
+              apt update && apt install -y libclang-dev clang curl build-essential libreadline-dev zlib1g-dev flex bison libxml2-dev libxslt-dev libssl-dev libxml2-utils xsltproc ccache pkg-config
               ;;
             arch)
-              pacman -Syu --noconfirm clang git curl base-devel readline zlib flex bison libxml2 libxslt openssl ccache pkgconf
+              pacman -Syu --noconfirm clang curl base-devel readline zlib flex bison libxml2 libxslt openssl ccache pkgconf
               ;;
             rhel)
               dnf makecache && dnf install -y epel-release && dnf makecache
-              dnf install -y clang clang-devel git curl bison readline-devel zlib-devel openssl-devel wget ccache libicu-devel && dnf groupinstall -y 'Development Tools'
+              dnf install -y clang clang-devel curl bison readline-devel zlib-devel openssl-devel wget ccache libicu-devel && dnf groupinstall -y 'Development Tools'
               ;;
             macos-*)
-              brew install llvm git curl readline bison flex zlib openssl ccache icu4c pkg-config gettext libiconv
+              brew install llvm curl readline bison flex zlib openssl ccache icu4c pkg-config gettext libiconv
               brew link icu4c --force
               export LDFLAGS="-L$(brew --prefix icu4c)/lib"
               export CPPFLAGS="-I$(brew --prefix icu4c)/include"
@@ -51,18 +51,13 @@ jobs:
       - name: Install Rust
         run: |
           if [[ "${{ matrix.os }}" == "rhel" ]]; then
-            adduser test
+            id -u test &>/dev/null || useradd -m test
             useradd -m test
             chown -R test:test /home/test
             cd ~
           fi
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
           echo "PATH=$HOME/.cargo/bin:$PATH" >> $GITHUB_ENV
-
-      - name: Clone pg_cardano repository
-        run: |
-          git clone https://github.com/cardano-community/pg_cardano.git
-          cd pg_cardano
 
       - name: Install specific version of cargo-pgrx
         run: |
