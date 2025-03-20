@@ -44,7 +44,7 @@ jobs:
       - name: Switch to test user
         run: |
           if [[ "${{ matrix.os }}" == "rhel" || "${{ matrix.os }}" == "debian" || "${{ matrix.os }}" == "arch" ]]; then
-            su - test -c "bash -c 'exec "$0" "$@"' -- "$SHELL""
+            exec su - test
           fi
 
       - name: Install dependencies
