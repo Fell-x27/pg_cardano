@@ -14,16 +14,36 @@ jobs:
     runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
-        os: [rhel]
+        os: [debian, arch, rhel, macos-x86_64, macos-arm64]
         include:
+          - os: debian
+            image: debian:latest
+            runner: ubuntu-latest
+          - os: arch
+            image: archlinux:latest
+            runner: ubuntu-latest
           - os: rhel
             image: almalinux:8
             runner: ubuntu-latest
+          - os: macos-x86_64
+            runner: macos-latest
+          - os: macos-arm64
+            runner: macos-latest
     container:
       image: ${{ matrix.image }}
+      options: --user test
+      env:
+        HOME: /home/test
+      options: --user test
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Create test user (if not exists)
+        run: |
+          if [[ "${{ matrix.os }}" == "rhel" || "${{ matrix.os }}" == "debian" || "${{ matrix.os }}" == "arch" ]]; then
+            id -u test &>/dev/null || useradd -m test
+          fi
 
       - name: Install dependencies
         run: |
@@ -50,11 +70,6 @@ jobs:
 
       - name: Install Rust
         run: |
-          if [[ "${{ matrix.os }}" == "rhel" ]]; then
-            id -u test &>/dev/null || id -u test &>/dev/null || useradd -m test
-            chown -R test:test /home/test
-            cd ~
-          fi
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
           echo "PATH=$HOME/.cargo/bin:$PATH" >> $GITHUB_ENV
 
@@ -73,13 +88,8 @@ jobs:
 
       - name: Run tests
         run: |
-          if [[ "${{ matrix.os }}" == "rhel" ]]; then
-            su - test -c "cargo test --package pg_cardano --lib tests"
-          else
-            cargo test --package pg_cardano --lib tests
-          fi
-          
-
+          cargo test --package pg_cardano --lib tests
+      
       - name: Create release artifact
         run: |
           chmod +x ./scripts/release.sh
