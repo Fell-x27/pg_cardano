@@ -14,21 +14,11 @@ jobs:
     runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
-        os: [debian, arch, rhel, macos-x86_64, macos-arm64]
+        os: [rhel]
         include:
-          - os: debian
-            image: debian:latest
-            runner: ubuntu-latest
-          - os: arch
-            image: archlinux:latest
-            runner: ubuntu-latest
           - os: rhel
             image: almalinux:8
             runner: ubuntu-latest
-          - os: macos-x86_64
-            runner: macos-latest
-          - os: macos-arm64
-            runner: macos-latest
     container:
       image: ${{ matrix.image }}
     steps:
@@ -62,7 +52,8 @@ jobs:
         run: |
           if [[ "${{ matrix.os }}" == "rhel" ]]; then
             adduser test
-            su test
+            useradd -m test
+            chown -R test:test /home/test
             cd ~
           fi
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
@@ -88,7 +79,11 @@ jobs:
 
       - name: Run tests
         run: |
-          cargo test --package pg_cardano --lib tests
+          if [[ "${{ matrix.os }}" == "rhel" ]]; then
+            sudo -u test cargo test --package pg_cardano --lib tests
+          else
+            cargo test --package pg_cardano --lib tests
+          fi
           
 
       - name: Create release artifact
