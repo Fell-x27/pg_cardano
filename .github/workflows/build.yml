@@ -41,12 +41,6 @@ jobs:
             id -u test &>/dev/null || useradd -m test
           fi
 
-      - name: Switch to test user
-        run: |
-          if [[ "${{ matrix.os }}" == "rhel" || "${{ matrix.os }}" == "debian" || "${{ matrix.os }}" == "arch" ]]; then
-            exec su - test
-          fi
-
       - name: Install dependencies
         run: |
           case "${{ matrix.os }}" in
@@ -70,6 +64,12 @@ jobs:
               ;;
           esac
 
+      - name: Switch to test user
+        run: |
+          if [[ "${{ matrix.os }}" == "rhel" || "${{ matrix.os }}" == "debian" || "${{ matrix.os }}" == "arch" ]]; then
+            exec su - test
+          fi
+          
       - name: Install Rust
         run: |
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
