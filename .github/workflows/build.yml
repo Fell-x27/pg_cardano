@@ -34,7 +34,6 @@ jobs:
       options: --user test
       env:
         HOME: /home/test
-      options: --user test
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
