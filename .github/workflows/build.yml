@@ -16,19 +16,9 @@ jobs:
       matrix:
         os: [rhel]
         include:
-          - os: debian
-            image: debian:latest
-            runner: ubuntu-latest
-          - os: arch
-            image: archlinux:latest
-            runner: ubuntu-latest
           - os: rhel
             image: almalinux:8
             runner: ubuntu-latest
-          - os: macos-x86_64
-            runner: macos-latest
-          - os: macos-arm64
-            runner: macos-latest
     container:
       image: ${{ matrix.image }}
     steps:
