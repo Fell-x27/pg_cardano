@@ -14,11 +14,21 @@ jobs:
     runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
-        os: [rhel]
+        os: [debian, arch, rhel, macos-x86_64, macos-arm64]
         include:
+          - os: debian
+            image: debian:latest
+            runner: ubuntu-latest
+          - os: arch
+            image: archlinux:latest
+            runner: ubuntu-latest
           - os: rhel
             image: almalinux:8
             runner: ubuntu-latest
+          - os: macos-x86_64
+            runner: macos-latest
+          - os: macos-arm64
+            runner: macos-latest
     container:
       image: ${{ matrix.image }}
     steps:
@@ -50,6 +60,11 @@ jobs:
 
       - name: Install Rust
         run: |
+          if [[ "${{ matrix.os }}" == "rhel" ]]; then
+            adduser test
+            su test
+            cd ~
+          fi
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
           echo "PATH=$HOME/.cargo/bin:$PATH" >> $GITHUB_ENV
 
@@ -73,19 +88,8 @@ jobs:
 
       - name: Run tests
         run: |
-          if [[ "${{ matrix.os }}" == "rhel" ]]; then
-            export TMPDIR=/tmp
-            export PGDATA=/tmp/pgdata
-            mkdir -p /dev/shm
-            mkdir -p /var/run/postgresql
-            chmod 1777 /dev/shm /var/run/postgresql
-            echo "Active PostgreSQL processes before tests:"
-            ps aux | grep postgres || true
-            export TMPDIR=/tmp
-            cargo test --package pg_cardano --lib tests -- --test-threads=1 --nocapture
-          else
-            cargo test --package pg_cardano --lib tests
-          fi
+          cargo test --package pg_cardano --lib tests
+          
 
       - name: Create release artifact
         run: |
