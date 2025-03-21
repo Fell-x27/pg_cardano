@@ -32,7 +32,7 @@ jobs:
         run: |
           case "${{ matrix.os }}" in
             linux)
-              sudo apt update && apt install -y libclang-dev clang curl build-essential libreadline-dev zlib1g-dev flex bison libxml2-dev libxslt-dev libssl-dev libxml2-utils xsltproc ccache pkg-config
+              sudo apt update && sudo apt install -y libclang-dev clang curl build-essential libreadline-dev zlib1g-dev flex bison libxml2-dev libxslt-dev libssl-dev libxml2-utils xsltproc ccache pkg-config
               ;;
             macos-*)
               brew install llvm curl readline bison flex zlib openssl ccache icu4c pkg-config gettext libiconv
