@@ -1,20 +1,22 @@
 #!/bin/bash
 
+set -euo pipefail
+
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG_FILE="$HOME/.pgrx/config.toml"
 CARGO_TOML="$DIR/../Cargo.toml"
+
 if [ ! -f "$CARGO_TOML" ]; then
-  echo "Error: Cargo.toml not found at $DIR/../"
+  echo "Error: Cargo.toml not found at $CARGO_TOML"
   exit 1
 fi
-
-DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 if [ ! -f "$CONFIG_FILE" ]; then
   echo "Configuration file not found at $CONFIG_FILE"
   exit 1
 fi
 
+# Получаем имя и версию пакета из Cargo.toml
 in_package=false
 PACKAGE_NAME=""
 PACKAGE_VERSION=""
@@ -34,24 +36,19 @@ while IFS='=' read -r key value; do
 
   if $in_package; then
     case "$key" in
-      "name")
-        PACKAGE_NAME=$(echo "$value" | tr -d '"')
-        ;;
-      "version")
-        PACKAGE_VERSION=$(echo "$value" | tr -d '"')
-        ;;
+      "name") PACKAGE_NAME=$(echo "$value" | tr -d '"') ;;
+      "version") PACKAGE_VERSION=$(echo "$value" | tr -d '"') ;;
     esac
   fi
-
 done < "$CARGO_TOML"
 
+# Считываем конфиги pg_config
 in_configs=false
-
 declare -A PG_CONFIGS
 
 while IFS='=' read -r key value; do
   key=$(echo "$key" | xargs)
-  value=$(echo "$value" | xargs)
+  value=$(echo "$value" | xargs | tr -d '"')
 
   if [[ "$key" == "[configs]" ]]; then
     in_configs=true
@@ -59,11 +56,8 @@ while IFS='=' read -r key value; do
   fi
 
   if $in_configs && [[ "$key" == pg* ]]; then
-    value=$(echo "$value" | tr -d '"')
-
-    PG_CONFIGS["$key"]=$value
+    PG_CONFIGS["$key"]="$value"
   fi
-
 done < "$CONFIG_FILE"
 
 if [ ${#PG_CONFIGS[@]} -eq 0 ]; then
@@ -78,40 +72,39 @@ OUTER_SQL_DIR="$DIR/../sql"
 
 cargo clean
 rm -rf "$DISTR_DIR"
-mkdir -p "$DISTR_DIR"
-mkdir -p "$BIN_DIR"
-mkdir -p "$MIGRATIONS_DIR"
+mkdir -p "$BIN_DIR" "$MIGRATIONS_DIR"
 
-# Scan OUTER_SQL_DIR for migration files
-latest_version=""
+# Выбираем самую последнюю миграцию по суффиксу
 latest_suffix=""
-
 for file in "$OUTER_SQL_DIR"/${PACKAGE_NAME}-*.sql; do
   if [[ -f "$file" ]]; then
-    filename=$(basename "$file")
-    suffix=$(echo "$filename" | sed -n "s/^${PACKAGE_NAME}--.*--\(.*\)\.sql$/\1/p")
+    suffix=$(basename "$file" | sed -n "s/^${PACKAGE_NAME}--.*--\\(.*\\)\\.sql$/\\1/p")
     if [[ -z "$latest_suffix" || "$suffix" > "$latest_suffix" ]]; then
       latest_suffix="$suffix"
     fi
   fi
 done
 
-# Check if the expected migration file exists
 expected_file="$OUTER_SQL_DIR/${PACKAGE_NAME}--${latest_suffix}--${PACKAGE_VERSION}.sql"
 if [[ "$latest_suffix" != "$PACKAGE_VERSION" && ! -f "$expected_file" ]]; then
   echo "Creating missing migration file: $expected_file"
   touch "$expected_file"
 fi
 
-for PG_VERSION in "${!PG_CONFIGS[@]}"; do
-  PG_CONFIG="${PG_CONFIGS[$PG_VERSION]}"
+# Основной цикл по версиям PostgreSQL
+for PG_KEY in "${!PG_CONFIGS[@]}"; do
+  PG_CONFIG="${PG_CONFIGS[$PG_KEY]}"
 
   if [ -f "$PG_CONFIG" ]; then
-    echo "Packaging for $PG_VERSION using $PG_CONFIG..."
+    ACTUAL_VERSION=$("$PG_CONFIG" --version | grep -oE '[0-9]+\\.[0-9]+' | head -n1)
+    PG_VERSION_DIR="pg${ACTUAL_VERSION//./}"
 
-    OUTPUT_DIR="$DIR/../target/release/pg_cardano-${PG_VERSION}"
-    TARGET_DIR="$BIN_DIR/${PG_VERSION}"
+    echo "Packaging for $PG_VERSION_DIR using $PG_CONFIG..."
+
+    OUTPUT_DIR="$DIR/../target/release/pg_cardano-${PG_VERSION_DIR}"
+    TARGET_DIR="$BIN_DIR/${PG_VERSION_DIR}"
     mkdir -p "$TARGET_DIR"
+
     cargo pgrx package --pg-config "$PG_CONFIG" --out-dir "$OUTPUT_DIR" --no-default-features
 
     INSTALL_DIR=$(find "$OUTPUT_DIR" -type d -name "pgrx-install")
@@ -119,16 +112,17 @@ for PG_VERSION in "${!PG_CONFIGS[@]}"; do
     if [ -d "$INSTALL_DIR" ]; then
       cp "$INSTALL_DIR/lib/postgresql/"* "$TARGET_DIR/"
       cp "$INSTALL_DIR/share/postgresql/extension/"* "$MIGRATIONS_DIR/"
-      echo "Files successfully extracted;"
+      echo "Files successfully extracted for $PG_VERSION_DIR."
     else
-      echo "pgrx-install directory not found in $OUTPUT_DIR for $PG_VERSION"
+      echo "pgrx-install directory not found in $OUTPUT_DIR for $PG_VERSION_DIR"
     fi
   else
-    echo "pg_config for $PG_VERSION not found!"
+    echo "pg_config for $PG_KEY not found at $PG_CONFIG"
   fi
 done
 
 cp "$DIR/install.sh" "$DISTR_DIR/"
 cp "$DIR/uninstall.sh" "$DISTR_DIR/"
 cp "$OUTER_SQL_DIR"/*.sql "$MIGRATIONS_DIR/"
+
 echo "Packaging completed."
