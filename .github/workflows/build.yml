@@ -14,13 +14,9 @@ jobs:
     runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
-        os: [debian, rhel, macos-x86_64, macos-arm64]
+        os: [linux, macos-x86_64, macos-arm64]
         include:
-          - os: debian
-            image: debian:latest
-            runner: ubuntu-latest
-          - os: rhel
-            image: almalinux:8
+          - os: linux
             runner: ubuntu-latest
           - os: macos-x86_64
             runner: macos-latest
@@ -35,15 +31,8 @@ jobs:
       - name: Install dependencies
         run: |
           case "${{ matrix.os }}" in
-            debian)
+            linux)
               apt update && apt install -y libclang-dev clang curl build-essential libreadline-dev zlib1g-dev flex bison libxml2-dev libxslt-dev libssl-dev libxml2-utils xsltproc ccache pkg-config
-              ;;
-            arch)
-              pacman -Syu --noconfirm clang curl base-devel readline zlib flex bison libxml2 libxslt openssl ccache pkgconf
-              ;;
-            rhel)
-              dnf makecache && dnf install -y epel-release && dnf makecache
-              dnf install -y clang clang-devel curl bison readline-devel zlib-devel openssl-devel wget ccache libicu-devel && dnf groupinstall -y 'Development Tools'
               ;;
             macos-*)
               brew install llvm curl readline bison flex zlib openssl ccache icu4c pkg-config gettext libiconv
@@ -75,12 +64,7 @@ jobs:
 
       - name: Run tests
         run: |
-          if [[ "${{ matrix.os }}" == "rhel" ]]; then
-            id -u test &>/dev/null || useradd -m test          
-            cargo pgrx test --runas test
-          else
             cargo test --package pg_cardano --lib tests
-          fi
       
       - name: Create release artifact
         run: |
