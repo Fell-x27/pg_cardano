@@ -77,17 +77,32 @@ jobs:
         run: |
             cargo test --package pg_cardano --lib tests
 
-      - name: Create release artifact
-        run: |
-          chmod +x ./scripts/release.sh
-          ./scripts/release.sh
-          echo "VERSION=$(grep '^version =' Cargo.toml | cut -d '"' -f 2)" >> $GITHUB_ENV
-
       - name: Upload artifact for release
         uses: actions/upload-artifact@v4
         with:
-          name: pg_cardano_${{ matrix.os }}_x86_64_v${{ env.VERSION }}.tar.gz
-          path: ./releases/*.tar.gz
+          name: pg_cardano_${{ matrix.os }}_x86_64_build
+          path: ./pg_cardano
           if-no-files-found: error
           retention-days: 90
           compression-level: 0
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          draft: true
+          body_path: ./RELEASE_NOTES.md
+          files: ./artifacts/**
