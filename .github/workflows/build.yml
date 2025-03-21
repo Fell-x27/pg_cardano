@@ -46,7 +46,7 @@ jobs:
               sudo apt update && sudo apt install -y libclang-dev clang curl build-essential libreadline-dev zlib1g-dev flex bison libxml2-dev libxslt-dev libssl-dev libxml2-utils xsltproc ccache pkg-config
               ;;
             macos-*)
-              brew install llvm curl readline bison flex zlib openssl ccache icu4c pkg-config gettext libiconv
+              brew install bash llvm curl readline bison flex zlib openssl ccache icu4c pkg-config gettext libiconv
               brew link icu4c --force
               export LDFLAGS="-L$(brew --prefix icu4c)/lib"
               export CPPFLAGS="-I$(brew --prefix icu4c)/include"
@@ -71,7 +71,7 @@ jobs:
       - name: Build distribution
         run: |
           chmod +x ./scripts/build.sh
-          ./scripts/build.sh
+          /opt/homebrew/bin/bash ./scripts/build.sh || bash ./scripts/build.sh
 
       - name: Run tests
         run: |
