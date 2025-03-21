@@ -14,13 +14,10 @@ jobs:
     runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
-        os: [debian, arch, rhel, macos-x86_64, macos-arm64]
+        os: [debian, rhel, macos-x86_64, macos-arm64]
         include:
           - os: debian
             image: debian:latest
-            runner: ubuntu-latest
-          - os: arch
-            image: archlinux:latest
             runner: ubuntu-latest
           - os: rhel
             image: almalinux:8
@@ -34,12 +31,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Create test user (if not exists)
-        run: |
-          if [[ "${{ matrix.os }}" == "rhel" || "${{ matrix.os }}" == "debian" || "${{ matrix.os }}" == "arch" ]]; then
-            id -u test &>/dev/null || useradd -m test
-          fi
 
       - name: Install dependencies
         run: |
@@ -64,12 +55,6 @@ jobs:
               ;;
           esac
 
-      - name: Switch to test user
-        run: |
-          if [[ "${{ matrix.os }}" == "rhel" || "${{ matrix.os }}" == "debian" || "${{ matrix.os }}" == "arch" ]]; then
-            exec su - test
-          fi
-          
       - name: Install Rust
         run: |
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
@@ -90,7 +75,12 @@ jobs:
 
       - name: Run tests
         run: |
-          cargo test --package pg_cardano --lib tests
+          if [[ "${{ matrix.os }}" == "rhel" ]]; then
+            id -u test &>/dev/null || useradd -m test          
+            cargo pgrx test --runas test
+          else
+            cargo test --package pg_cardano --lib tests
+          fi
       
       - name: Create release artifact
         run: |
