@@ -1,0 +1,121 @@
+name: Build, Test and release pg_cardano
+
+on:
+  push:
+    branches:
+      - "*"
+  pull_request:
+    branches:
+      - "*"
+
+jobs:
+  build:
+    name: Build and Test on ${{ matrix.os }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        os: [linux, macos_amd64]
+        include:
+          - os: linux
+            runner: ubuntu-latest
+          - os: macos_amd64
+            runner: macos-latest
+    container:
+      image: ${{ matrix.image }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Cache cargo registry and build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Install dependencies
+        run: |
+          case "${{ matrix.os }}" in
+            linux*)
+              sudo apt update && sudo apt install -y postgresql libclang-dev clang curl build-essential libreadline-dev zlib1g-dev flex bison libxml2-dev libxslt-dev libssl-dev libxml2-utils xsltproc ccache pkg-config
+              ;;
+            macos*)
+              brew install bash postgresql llvm curl readline bison flex zlib openssl ccache icu4c pkg-config gettext libiconv
+              brew link icu4c --force
+              export LDFLAGS="-L$(brew --prefix icu4c)/lib"
+              export CPPFLAGS="-I$(brew --prefix icu4c)/include"
+              export PKG_CONFIG_PATH="$(brew --prefix)/opt/icu4c/lib/pkgconfig"
+              export CMAKE_PREFIX_PATH=/usr/local/opt/icu4c
+              ;;
+          esac
+
+      - name: Install Rust
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+          echo "PATH=$HOME/.cargo/bin:$PATH" >> $GITHUB_ENV
+
+      - name: Install specific cargo-pgrx
+        run: |
+          cargo install --version 0.12.9 cargo-pgrx
+
+      - name: Initialize cargo-pgrx
+        run: |
+          cargo pgrx init
+
+      - name: Build distribution
+        run: |
+          chmod +x ./scripts/build.sh
+          /opt/homebrew/bin/bash ./scripts/build.sh || bash ./scripts/build.sh
+
+      - name: Run tests
+        run: |
+          cargo test --package pg_cardano --lib tests
+          ./scripts/install.sh
+          ./scripts/uninstall.sh
+
+      - name: Extract version from Cargo.toml
+        id: get_version
+        run: |
+          VERSION=$(grep '^version' Cargo.toml | head -n 1 | cut -d '"' -f 2)
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pg_cardano_v${{ env.VERSION }}_${{ matrix.os }}
+          path: ./pg_cardano
+          if-no-files-found: error
+          retention-days: 90
+          compression-level: 0
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+
+      - name: Extract version from tag
+        id: extract_tag
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          draft: true
+          body_path: ./release_notes/${{ steps.extract_tag.outputs.version }}.md
+          files: ./artifacts/**

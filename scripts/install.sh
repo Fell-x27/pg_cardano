@@ -1,19 +1,38 @@
 #!/bin/bash
 
-BOLD="\e[1m"
-RESET="\e[0m"
-YELLOW="\e[33m"
-GREEN="\e[32m"
-BLUE="\e[34m"
-RED="\e[31m"
+
+BOLD=$(tput bold)
+RESET=$(tput sgr0)
+YELLOW=$(tput setaf 3)
+GREEN=$(tput setaf 2)
+BLUE=$(tput setaf 4)
+RED=$(tput setaf 1)
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+
+if [[ "$OSTYPE" == "darwin"* ]]; then
+  if ! command -v pg_config &> /dev/null; then
+    BREW_PREFIX=$(brew --prefix postgresql 2>/dev/null || true)
+    if [[ -n "$BREW_PREFIX" && -x "$BREW_PREFIX/bin/pg_config" ]]; then
+      export PATH="$BREW_PREFIX/bin:$PATH"
+      echo "${BOLD}${BLUE}Using pg_config from: $BREW_PREFIX/bin/pg_config${RESET}"
+    fi
+  fi
+fi
+
+
 if ! command -v pg_config &> /dev/null; then
-  echo -e "${BOLD}${RED}Error: pg_config not found.${RESET}"
-  echo -e "${BOLD}${YELLOW}Please install the PostgreSQL development package for your system.${RESET}"
+  echo "${BOLD}${RED}Error: pg_config not found.${RESET}"
+  echo "${BOLD}${YELLOW}Please ensure PostgreSQL is installed.${RESET}"
+  if [[ "$OSTYPE" == "darwin"* ]]; then
+    echo ""
+    echo "To install it on macOS, run:"
+    echo "  ${BOLD}brew install postgresql${RESET}"
+  fi
   exit 1
 fi
+
 
 get_pg_config_value() {
   local key="$1"
@@ -23,9 +42,8 @@ get_pg_config_value() {
 # Description : Exit with error message
 #             : $1 = Error message we'd like to display before exiting (function will pre-fix 'ERROR: ' to the argument)
 err_exit() {
-  printf "${BOLD}${RED}ERROR: ${1} ${RESET}\n" >&2
-  echo -e "Exiting...\n" >&2
-  pushd -0 >/dev/null && dirs -c
+  printf "${BOLD}${RED}ERROR: %s${RESET}\n" "$1" >&2
+  echo "Exiting..." >&2
   exit 1
 }
 
@@ -33,13 +51,12 @@ PG_VERSION=$(get_pg_config_value "VERSION" | awk '{print $2}' | cut -d'.' -f1)
 SHAREDIR=$(get_pg_config_value "SHAREDIR")
 PKGLIBDIR=$(get_pg_config_value "PKGLIBDIR")
 
-echo -e "${BOLD}${YELLOW}Detected PostgreSQL major version: $PG_VERSION${RESET}"
-echo -e "${BOLD}${YELLOW}Detected SHAREDIR: $SHAREDIR${RESET}"
-echo -e "${BOLD}${YELLOW}Detected PKGLIBDIR: $PKGLIBDIR${RESET}"
+echo "${BOLD}${YELLOW}Detected PostgreSQL major version: $PG_VERSION${RESET}"
+echo "${BOLD}${YELLOW}Detected SHAREDIR: $SHAREDIR${RESET}"
+echo "${BOLD}${YELLOW}Detected PKGLIBDIR: $PKGLIBDIR${RESET}"
 
 if [ -z "$PG_VERSION" ] || [ -z "$SHAREDIR" ] || [ -z "$PKGLIBDIR" ]; then
-  echo -e "${BOLD}${RED}Error: Failed to detect PostgreSQL paths.${RESET}"
-  exit 1
+  err_exit "Failed to detect PostgreSQL paths via pg_config"
 fi
 
 BIN_DIR="./bin/pg$PG_VERSION"
@@ -52,31 +69,27 @@ fi
 
 [ -d "$BIN_DIR" ] || err_exit "Directory with pre-built extension for PostgreSQL $PG_VERSION not found."
 
-echo -e "${BOLD}${GREEN}Found extension directory: $BIN_DIR${RESET}"
+echo "${BOLD}${GREEN}Found extension directory: $BIN_DIR${RESET}"
+echo "${BOLD}${BLUE}Now copying files to system directories. You may be prompted for your password.${RESET}"
 
-echo -e "${BOLD}${BLUE}Now copying files to system directories, this requires sudo privileges.${RESET}"
+sudo mkdir -p "$SHAREDIR/extension" "$PKGLIBDIR" || err_exit "Failed to create target directories"
 
-sudo mkdir -p "$SHAREDIR"
-sudo mkdir -p "$SHAREDIR/extension/"
-sudo mkdir -p "$PKGLIBDIR"
+sudo cp "$MIGRATIONS_DIR"/*.control "$SHAREDIR/extension/" 2>/dev/null || err_exit "Failed to copy control files"
+sudo cp "$MIGRATIONS_DIR"/*.sql "$SHAREDIR/extension/" 2>/dev/null || err_exit "Failed to copy SQL files"
+sudo cp "$BIN_DIR"/* "$PKGLIBDIR/" 2>/dev/null || err_exit "Failed to copy files"
 
-sudo cp "$MIGRATIONS_DIR"/*.control "$SHAREDIR/extension/" 2>/dev/null || err_exit "Failed to copy control files to $SHAREDIR/extension."
+echo "${BOLD}${GREEN}========================================${RESET}"
+echo "${BOLD}${GREEN}EXTENSION PG_CARDANO IS READY TO USE!${RESET}"
+echo "${BOLD}${GREEN}========================================${RESET}"
 
-sudo cp "$MIGRATIONS_DIR"/*.sql "$SHAREDIR/extension/" 2>/dev/null || err_exit "Failed to copy SQL files to $SHAREDIR/extension."
+echo ""
+echo "1) To create the extension, run in psql:"
+echo "   ${BOLD}CREATE EXTENSION pg_cardano;${RESET}"
 
-sudo cp "$BIN_DIR"/*.so "$PKGLIBDIR/" 2>/dev/null || err_exit "Failed to copy .so files to $PKGLIBDIR."
+echo ""
+echo "2) To update existing extension:"
+echo "   ${BOLD}ALTER EXTENSION pg_cardano UPDATE;${RESET}"
 
-echo -e "${BOLD}${GREEN}========================================${RESET}"
-echo -e "${BOLD}${GREEN}EXTENSION PG_CARDANO IS READY TO USE!${RESET}"
-echo -e "${BOLD}${GREEN}========================================${RESET}"
-
-echo -e "Don't forget to activate the extension in your database!"
-echo -e " \n1) To create the extension, run the following command in your PostgreSQL instance:"
-echo -e "   ${BOLD}CREATE EXTENSION pg_cardano;${RESET}"
-
-echo -e "\n2) If the extension already exists, you can update it to the latest version:"
-echo -e "   ${BOLD}ALTER EXTENSION pg_cardano UPDATE;${RESET}"
-
-echo -e "\nFor more information, you can refer to the official documentation:"
-echo -e "   ${BLUE}https://github.com/cardano-community/pg_cardano/blob/master/README.md${RESET}"
-
+echo ""
+echo "For more info:"
+echo "   ${BLUE}https://github.com/cardano-community/pg_cardano/blob/master/README.md${RESET}"
