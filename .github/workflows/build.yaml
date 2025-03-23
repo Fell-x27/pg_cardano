@@ -16,7 +16,7 @@ jobs:
       matrix:
         os: [linux_amd64, macos_amd64]
         include:
-          - os: linux
+          - os: linux_amd64
             runner: ubuntu-latest
           - os: macos_amd64
             runner: macos-latest
