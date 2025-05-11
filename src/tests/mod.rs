@@ -90,7 +90,7 @@ mod tests {
     }
 
     #[pg_test]
-    fn test_cbor_dec_to_jsonb_hes_as_hex() {
+    fn test_cbor_dec_to_jsonb_hex_as_hex() {
         let original_json = pgrx::JsonB(serde_json::json!({
             "ada": "is amazing!",
             "version": 1.0,
@@ -136,15 +136,274 @@ mod tests {
     }
 
     #[pg_test]
-    fn test_cbor_dec_to_jsonb_with_null_symbol() {
+    fn test_cbor_dec_to_jsonb_extended() {
+        let original_json = pgrx::JsonB(serde_json::json!({
+              "tag": null,
+              "type": "map",
+              "value": [
+                {
+                  "key": {
+                    "tag": null,
+                    "type": "string",
+                    "value": "ada"
+                  },
+                  "value": {
+                    "tag": null,
+                    "type": "string",
+                    "value": "is amazing!"
+                  }
+                },
+                {
+                  "key": {
+                    "tag": null,
+                    "type": "string",
+                    "value": "hex"
+                  },
+                  "value": {
+                    "tag": null,
+                    "type": "bytes",
+                    "value": "6648d73a09b282c120c8476789f8232b7eead94ff560917ae8fc4eb1"
+                  }
+                },
+                {
+                  "key": {
+                    "tag": null,
+                    "type": "string",
+                    "value": "version"
+                  },
+                  "value": {
+                    "tag": null,
+                    "type": "float",
+                    "value": 1.0
+                  }
+                },
+                {
+                  "key": {
+                    "tag": null,
+                    "type": "string",
+                    "value": "features"
+                  },
+                  "value": {
+                    "tag": null,
+                    "type": "array",
+                    "value": [
+                      {
+                        "tag": null,
+                        "type": "string",
+                        "value": "science"
+                      },
+                      {
+                        "tag": null,
+                        "type": "string",
+                        "value": "approach"
+                      }
+                    ]
+                  }
+                }
+              ]
+            }));
+
+        let cbor_bytes = hex::decode("a4636164616b697320616d617a696e672163686578581c6648d73a09b282c120c8476789f8232b7eead94ff560917ae8fc4eb16776657273696f6ef93c006866656174757265738267736369656e636568617070726f616368")
+            .expect("Failed to decode hex");
+        let result = crate::cardano::cbor_decode_jsonb_ext(&cbor_bytes);
+
+        let expected_output =
+            serde_json::to_string(&original_json.0).expect("Failed to serialize original_json");
+        let result_str = serde_json::to_string(&result.0).expect("Failed to serialize result");
+
+        assert_eq!(expected_output, result_str);
+    }
+
+    #[pg_test]
+    fn test_cbor_roundtrip_no_tags_extended() {
+        let cbor_bytes = hex::decode("a4636164616b697320616d617a696e672163686578581c6648d73a09b282c120c8476789f8232b7eead94ff560917ae8fc4eb16776657273696f6ef93c006866656174757265738267736369656e636568617070726f616368")
+            .expect("Failed to decode hex");
+        let decoded_jsonb = crate::cardano::cbor_decode_jsonb_ext(&cbor_bytes);
+        let restored_cbor = crate::cardano::cbor_encode_jsonb_ext(decoded_jsonb);
+
+        assert_eq!(cbor_bytes, restored_cbor)
+    }
+
+    #[pg_test]
+    fn test_cbor_roundtrip_tagged_extended() {
+        let cbor_bytes = hex::decode("a46673696d706c65d8266568656c6c6f666e6573746564d81843010203656172726179d903e883010203636d6170d91388a26161f56162f6")
+            .expect("Failed to decode hex");
+        let decoded_jsonb = crate::cardano::cbor_decode_jsonb_ext(&cbor_bytes);
+        let restored_cbor = crate::cardano::cbor_encode_jsonb_ext(decoded_jsonb);
+
+        assert_eq!(cbor_bytes, restored_cbor)
+    }
+
+    #[pg_test]
+    fn test_cbor_dec_to_jsonb_extended_with_null_symbol() {
+        let original_json = pgrx::JsonB(serde_json::json!({
+              "tag": null,
+              "type": "map",
+              "value": [
+                {
+                  "key": {
+                    "tag": null,
+                    "type": "string",
+                    "value": "a"
+                  },
+                  "value": {
+                    "tag": null,
+                    "type": "int",
+                    "value": 1
+                  }
+                },
+                {
+                  "key": {
+                    "tag": null,
+                    "type": "string",
+                    "nulls": [
+                      1
+                    ],
+                    "value": "b"
+                  },
+                  "value": {
+                    "tag": null,
+                    "type": "string",
+                    "nulls": [
+                      2
+                    ],
+                    "value": "cd"
+                  }
+                }
+              ]
+            }));
+
         let cbor_bytes = hex::decode("a261610162620063636400")
             .expect("Failed to decode hex");
 
-        let result = crate::cardano::cbor_decode_jsonb(&cbor_bytes);
+        let result = crate::cardano::cbor_decode_jsonb_ext(&cbor_bytes);
 
-        let result_str = serde_json::to_string(&result.0).expect("Failed to convert JsonB to string");
+        let expected_output =
+            serde_json::to_string(&original_json.0).expect("Failed to serialize original_json");
+        let result_str = serde_json::to_string(&result.0).expect("Failed to serialize result");
 
-        assert_eq!("{\"a\":1,\"b\":\"cd\"}", result_str);
+        assert_eq!(expected_output, result_str);
+    }
+
+    #[pg_test]
+    fn test_cbor_enc_jsonb_extended() {
+        let original_json = pgrx::JsonB(serde_json::json!({
+              "tag": null,
+              "type": "map",
+              "value": [
+                {
+                  "key": {
+                    "tag": null,
+                    "type": "string",
+                    "value": "ada"
+                  },
+                  "value": {
+                    "tag": null,
+                    "type": "string",
+                    "value": "is amazing!"
+                  }
+                },
+                {
+                  "key": {
+                    "tag": null,
+                    "type": "string",
+                    "value": "hex"
+                  },
+                  "value": {
+                    "tag": null,
+                    "type": "bytes",
+                    "value": "6648d73a09b282c120c8476789f8232b7eead94ff560917ae8fc4eb1"
+                  }
+                },
+                {
+                  "key": {
+                    "tag": null,
+                    "type": "string",
+                    "value": "version"
+                  },
+                  "value": {
+                    "tag": null,
+                    "type": "float",
+                    "value": 1.0
+                  }
+                },
+                {
+                  "key": {
+                    "tag": null,
+                    "type": "string",
+                    "value": "features"
+                  },
+                  "value": {
+                    "tag": null,
+                    "type": "array",
+                    "value": [
+                      {
+                        "tag": null,
+                        "type": "string",
+                        "value": "science"
+                      },
+                      {
+                        "tag": null,
+                        "type": "string",
+                        "value": "approach"
+                      }
+                    ]
+                  }
+                }
+              ]
+            }));
+
+        let expected_output = hex::decode("a4636164616b697320616d617a696e672163686578581c6648d73a09b282c120c8476789f8232b7eead94ff560917ae8fc4eb16776657273696f6ef93c006866656174757265738267736369656e636568617070726f616368")
+            .expect("Failed to decode hex");
+        let result = crate::cardano::cbor_encode_jsonb_ext(original_json);
+
+        assert_eq!(expected_output, result);
+    }
+
+    #[pg_test]
+    fn test_cbor_enc_jsonb_extended_with_null_symbol() {
+        let original_json = pgrx::JsonB(serde_json::json!({
+              "tag": null,
+              "type": "map",
+              "value": [
+                {
+                  "key": {
+                    "tag": null,
+                    "type": "string",
+                    "value": "a"
+                  },
+                  "value": {
+                    "tag": null,
+                    "type": "int",
+                    "value": 1
+                  }
+                },
+                {
+                  "key": {
+                    "tag": null,
+                    "type": "string",
+                    "nulls": [
+                      1
+                    ],
+                    "value": "b"
+                  },
+                  "value": {
+                    "tag": null,
+                    "type": "string",
+                    "nulls": [
+                      2
+                    ],
+                    "value": "cd"
+                  }
+                }
+              ]
+            }));
+
+        let expected_output = hex::decode("a261610162620063636400")
+            .expect("Failed to decode hex");
+        let result = crate::cardano::cbor_encode_jsonb_ext(original_json);
+
+        assert_eq!(expected_output, result);
     }
 
     #[pg_test]

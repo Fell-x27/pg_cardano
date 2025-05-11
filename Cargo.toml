@@ -1,6 +1,6 @@
 [package]
 name = "pg_cardano"
-version = "1.0.5-p2"
+version = "1.0.6"
 edition = "2021"
 
 [lib]
@@ -33,6 +33,7 @@ pgrx = { version = "0.12"}
 hex = "0.4.3"
 linked-hash-map = { version = "0.5", features = ["serde"] }
 indexmap = { version = "2.7.1", features = ["serde"] }
+ciborium = "0.2.2"
 
 [dev-dependencies]
 pgrx-tests = "=0.12"

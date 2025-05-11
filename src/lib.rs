@@ -1,6 +1,5 @@
 mod helpers;
 mod tests;
-
 use bech32::{self, decode, encode, Bech32, Hrp};
 use bs58;
 use hex;
@@ -9,8 +8,15 @@ use pgrx::prelude::*;
 use pgrx::*;
 
 use serde::{Deserialize, Serialize};
-use serde_cbor::{from_slice, to_vec, Value as CborValue};
+use serde_cbor::{from_slice, to_vec};
+use serde_cbor::value::Value as CborValue;
 use serde_json::{Value as JsonValue};
+
+use ciborium::value::{Value as CborValueTagged, Integer};
+use ciborium::de::from_reader;
+use ciborium::ser::into_writer;
+
+use std::io::Cursor;
 
 use blake2::digest::{Update, VariableOutput};
 use blake2::Blake2bVar;
@@ -60,13 +66,13 @@ mod cardano {
     #[pg_extern]
     pub(crate) fn cbor_encode_jsonb(input: JsonB) -> Vec<u8> {
         let value: JsonValue = serde_json::from_value(input.0).expect("Failed to parse JsonB");
-        let transformed = transform_json(value);
+        let transformed = json_to_cbor(&value);
         to_vec(&transformed).expect("Failed to encode CBOR")
     }
 
 
     #[pg_extern]
-    pub fn cbor_decode_jsonb(
+    pub(crate) fn cbor_decode_jsonb(
         cbor_bytes: &[u8],
     ) -> JsonB {
         JsonB(cbor_to_json(
@@ -75,12 +81,32 @@ mod cardano {
     }
 
     #[pg_extern]
-    pub fn cbor_decode_jsonb_hex2bytea(
+    pub(crate) fn cbor_decode_jsonb_hex2bytea(
         cbor_bytes: &[u8],
     ) -> JsonB {
         JsonB(cbor_to_json(
             from_slice(cbor_bytes).expect("Failed to decode CBOR"), true
         ))
+    }
+
+    #[pg_extern]
+    pub(crate) fn cbor_decode_jsonb_ext(
+        cbor_bytes: &[u8],
+    ) -> JsonB {
+        let cbor = Cursor::new(cbor_bytes);
+        let json: CborValueTagged = from_reader(cbor).expect("Failed to decode CBOR");
+        JsonB(cbor_to_json_ext(&json))
+    }
+
+    #[pg_extern]
+    pub(crate) fn cbor_encode_jsonb_ext(input: JsonB) -> Vec<u8> {
+        let json: JsonValue =
+            serde_json::from_value(input.0).expect("Failed to parse JsonB");
+        let cbor: CborValueTagged = json_to_cbor_ext(&json);
+        let mut buf = Vec::new();
+        into_writer(&cbor, &mut buf)
+            .expect("Failed to serialize CBOR via ciborium");
+        buf
     }
 
     // Blake2B
