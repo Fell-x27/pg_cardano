@@ -55,15 +55,15 @@ mod tests {
     #[pg_test]
     fn test_cbor_enc_jsonb() {
         let original_json = pgrx::JsonB(serde_json::json!({
+            "ada": "is amazing!",
             "version": 1.0,
             "features": [
                 "science",
                 "approach"
-            ],
-            "ada": "is amazing!"
+            ]
         }));
 
-        let expected_output = hex::decode("a3636164616b697320616d617a696e67216776657273696f6ef93c006866656174757265738267736369656e636568617070726f616368")
+        let expected_output = hex::decode("a3636164616b697320616d617a696e67216866656174757265738267736369656e636568617070726f6163686776657273696f6ef93c00")
             .expect("Failed to decode hex");
         let result = crate::cardano::cbor_encode_jsonb(original_json);
 
@@ -82,7 +82,7 @@ mod tests {
             "hex": "\\x6648d73a09b282c120c8476789f8232b7eead94ff560917ae8fc4eb1"
         }));
 
-        let expected_output = hex::decode("a4636164616b697320616d617a696e672163686578581c6648d73a09b282c120c8476789f8232b7eead94ff560917ae8fc4eb16776657273696f6ef93c006866656174757265738267736369656e636568617070726f616368")
+        let expected_output = hex::decode("a4636164616b697320616d617a696e67216866656174757265738267736369656e636568617070726f61636863686578581c6648d73a09b282c120c8476789f8232b7eead94ff560917ae8fc4eb16776657273696f6ef93c00")
             .expect("Failed to decode hex");
         let result = crate::cardano::cbor_encode_jsonb(original_json);
 
@@ -647,36 +647,4 @@ mod tests {
         let result = crate::cardano::tools_verify_cip88_pool_key_registration(&cbor_data);
         assert!(!result, "Expected is_valid to be false, but got true");
     }
-
-    // #[pg_test]
-    // fn test_tools_verify_cip88_pool_key_registration_no_hash_new() {
-    //     let cbor_data = hex::decode("a1190363a3000201a5018201581c6648d73a09b282c120c8476789f8232b7eead94ff560917ae8fc4eb10280038102041a08d77f10075820fb01193646bb8820cc8c1fc70752d068e1b37be2f1aef88a2bc70cf598de6a630281a201a40101032720062158201ca00b7625ea6a25a6c8c128e308877a563d133ff108147fd1edc36eca3a447c02845829a201276761646472657373581c6648d73a09b282c120c8476789f8232b7eead94ff560917ae8fc4eb10058203a1807ae73acd6dc91f39fa2f6d24e0996d348bb21939e1d9bc5cd75dd778a6858406b8978326e011a9531ac55040adeba410edd9ad8d28b59ad2b7b7d5923b82745ed85155c0ba367b2e54aa8e1f91eb96a58e8249f89d5d0b1f83ba4946d808607").unwrap();
-    //
-    //     let result = crate::cardano::tools_verify_cip88_pool_key_registration_new(&cbor_data);
-    //     assert!(result, "Expected is_valid to be true, but got false");
-    // }
-    //
-    // #[pg_test]
-    // fn test_tools_verify_cip88_pool_key_registration_hash_new() {
-    //     let cbor_data = hex::decode("a1190363a3000201a5018201581c6648d73a09b282c120c8476789f8232b7eead94ff560917ae8fc4eb10280038102041a08d7891a075820fb01193646bb8820cc8c1fc70752d068e1b37be2f1aef88a2bc70cf598de6a630281a201a40101032720062158201ca00b7625ea6a25a6c8c128e308877a563d133ff108147fd1edc36eca3a447c02845829a201276761646472657373581c6648d73a09b282c120c8476789f8232b7eead94ff560917ae8fc4eb101581c840ab20690f19a03b8bcd3c5ee40aa4829d933a2dcc25e6b82acc57e5840301ae3df60b66323059bef0f25a508eb025c881c72c04f02745f43d2679403e48d3bd1e605b5cb948935392369c7ce2d3649a3ab6335f68730ce053e411bc407").unwrap();
-    //
-    //     let result = crate::cardano::tools_verify_cip88_pool_key_registration_new(&cbor_data);
-    //     assert!(result, "Expected is_valid to be true, but got false");
-    // }
-    //
-    // #[pg_test]
-    // fn test_tools_verify_cip88_pool_key_registration_no_hash_fail_new() {
-    //     let cbor_data = hex::decode("a1190363a3000201a5018201581c6648d73a09b282c120c8476789f8232b7eead94ff560917ae8fc4eb10280038102041a08d77f10075820fb01193646bb8820cc8c1fc70752d068e1b37be2f1aef88a2bc70cf598de6a630281a201a40101032720062158201ca00b7625ea6a25a6c8c128e308877a563d133ff108147fd1edc36eca3a447c02845829a201276761646472657373581c6648d73a09b282c120c8476789f8232b7eead94ff560917ae8fc4eb10058203a1807ae73acd6dc91f39fa2f6d24e0996d348bb21939e1d9bc5cd75dd778a6858406b8978326e011a9531ac55040adaba410edd9ad8d28b59ad2b7b7d5923b82745ed85155c0ba367b2e54aa8e1f91eb96a58e8249f89d5d0b1f83ba4946d808607").unwrap();
-    //
-    //     let result = crate::cardano::tools_verify_cip88_pool_key_registration_new(&cbor_data);
-    //     assert!(!result, "Expected is_valid to be false, but got true");
-    // }
-    //
-    // #[pg_test]
-    // fn test_tools_verify_cip88_pool_key_registration_hash_fail_new() {
-    //     let cbor_data = hex::decode("a1190363a3000201a5018201581c6648d73a09b282c120c8476789f8232b7eead94ff560917ae8fc4eb10280038102041a08d7891a075820fb01193646bb8820cc8c1fc70752d068e1b37be2f1aef88a2bc70cf598de6a630281a201a40101032720062158201ca00b7625ea6a25a6c8c128e308877a563d133ff108147fd1edc36eca3a447c02845829a201276761646472657373581c6648d73a09b282c120c8476789f8232b7eead94ff560917ae8fc4eb101581c840ab20690f19a03b8bcd3c5ee40aa4829d933a2dcc25e6b82acc57e5840301ae3df60b66323059befaf25a508eb025c881c72c04f02745f43d2679403e48d3bd1e605b5cb948935392369c7ce2d3649a3ab6335f68730ce053e411bc407").unwrap();
-    //
-    //     let result = crate::cardano::tools_verify_cip88_pool_key_registration_new(&cbor_data);
-    //     assert!(!result, "Expected is_valid to be false, but got true");
-    // }
 }

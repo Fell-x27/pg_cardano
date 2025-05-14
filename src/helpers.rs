@@ -1,10 +1,6 @@
-use ciborium::value::Value as CborValueTagged;
+use ciborium::value::Value as CborValue;
+use serde_json::{json, Map as JsonMap, Number, Value as JsonValue};
 use hex;
-use serde_cbor::value::Value as CborValue;
-use serde_cbor::{self};
-use serde_json::json;
-use serde_json::Value as JsonValue;
-
 
 pub fn json_to_cbor(value: &JsonValue) -> CborValue {
     match value {
@@ -15,36 +11,39 @@ pub fn json_to_cbor(value: &JsonValue) -> CborValue {
 
             if let Some(hex_str) = s.strip_prefix("0x").or_else(|| s.strip_prefix("\\x")) {
                 if hex_str.len() % 2 == 0 && hex_str.bytes().all(|b| b.is_ascii_hexdigit()) {
-                    return CborValue::Bytes(hex::decode(hex_str).expect("Invalid hex string"));
+                    return CborValue::Bytes(hex::decode(hex_str).unwrap_or_default());
                 }
             }
 
-            CborValue::Text(s.to_owned())
+            CborValue::Text(s.clone())
         }
+
         JsonValue::Object(obj) => {
-            let transformed_obj = obj
-                .into_iter()
-                .map(|(k, v)| {
-                    (
-                        k.parse::<i64>().map_or_else(
-                            |_| CborValue::Text(k.to_owned()),
-                            |num| CborValue::Integer(num as i128),
-                        ),
-                        json_to_cbor(v),
-                    )
-                })
-                .collect();
-            CborValue::Map(transformed_obj)
+            let items = obj.iter().map(|(k, v)| {
+                let key = k.parse::<i64>()
+                    .map_or(CborValue::Text(k.clone()), |n| CborValue::Integer(n.into()));
+                (key, json_to_cbor(v))
+            }).collect();
+
+            CborValue::Map(items)
         }
-        JsonValue::Array(arr) => CborValue::Array(arr.into_iter().map(json_to_cbor).collect()),
+
+        JsonValue::Array(arr) => {
+            CborValue::Array(arr.iter().map(json_to_cbor).collect())
+        }
+
         JsonValue::Number(n) => {
             if let Some(i) = n.as_i64() {
-                CborValue::Integer(i as i128)
+                CborValue::Integer(i.into())
+            } else if let Some(f) = n.as_f64() {
+                CborValue::Float(f)
             } else {
-                CborValue::Float(n.as_f64().unwrap_or(0.0))
+                CborValue::Float(0.0)
             }
         }
-        JsonValue::Bool(b) => CborValue::Bool(b.to_owned()),
+
+        JsonValue::Bool(b) => CborValue::Bool(*b),
+
         JsonValue::Null => CborValue::Null,
     }
 }
@@ -52,71 +51,115 @@ pub fn json_to_cbor(value: &JsonValue) -> CborValue {
 pub fn cbor_to_json(value: CborValue, with_byte_arrays: bool) -> JsonValue {
     match value {
         CborValue::Null => JsonValue::Null,
+
         CborValue::Bool(b) => JsonValue::Bool(b),
-        CborValue::Integer(i) => JsonValue::Number(serde_json::Number::from(i as i64)),
-        CborValue::Float(f) => {
-            JsonValue::Number(serde_json::Number::from_f64(f).expect("Invalid float value"))
-        }
-        CborValue::Bytes(b) => {
-            if let Ok(nested_cbor) = serde_cbor::from_slice::<CborValue>(&b) {
-                return cbor_to_json(nested_cbor, with_byte_arrays);
+
+        CborValue::Integer(i) => {
+            let n: i128 = i.clone().into();
+
+            match i64::try_from(n) {
+                Ok(as_i64) => JsonValue::Number(serde_json::Number::from(as_i64)),
+                Err(_) => JsonValue::String(n.to_string()),
             }
-            let encoded = hex::encode(b);
+        }
+
+        CborValue::Float(f) => {
+            JsonValue::Number(Number::from_f64(f).expect("Invalid float"))
+        }
+
+        CborValue::Bytes(b) => {
+            if let Ok(nested_any) = ciborium::de::from_reader::<CborValue, _>(b.as_slice()) {
+                match &nested_any {
+                    CborValue::Map(_)
+                    |CborValue::Array(_)
+                    | CborValue::Tag(_, _)
+                    | CborValue::Text(_) => {
+                        let nested = CborValue::from(nested_any);
+                        return cbor_to_json(nested, with_byte_arrays);
+                    }
+                    _ => {}
+                }
+            }
+
+            let hex_str = hex::encode(b);
             JsonValue::String(if with_byte_arrays {
-                format!("\\x{}", encoded)
+                format!("\\x{}", hex_str)
             } else {
-                encoded
+                hex_str
             })
         }
-        CborValue::Text(t) => JsonValue::String(t.replace('\u{0}', "")),
-        CborValue::Array(arr) => JsonValue::Array(
-            arr.into_iter()
+
+        CborValue::Text(t) => {
+            JsonValue::String(t.replace('\u{0}', ""))
+        }
+
+        CborValue::Array(arr) => {
+            let items = arr.into_iter()
                 .map(|v| cbor_to_json(v, with_byte_arrays))
-                .collect(),
-        ),
+                .collect();
+            JsonValue::Array(items)
+        }
+
         CborValue::Map(map) => {
-            let mut ordered_map = serde_json::Map::new();
+            let mut result = JsonMap::new();
+
             for (k, v) in map {
                 let key = match k {
                     CborValue::Text(t) => t.replace('\u{0}', ""),
                     CborValue::Bytes(b) => {
-                        let encoded = hex::encode(b);
+                        let hex_str = hex::encode(b);
                         if with_byte_arrays {
-                            format!("\\x{}", encoded)
+                            format!("\\x{}", hex_str)
                         } else {
-                            encoded
+                            hex_str
                         }
                     }
-                    CborValue::Integer(i) => i.to_string(),
-                    _ => {
-                        let encoded = hex::encode(serde_cbor::to_vec(&k).unwrap());
+                    CborValue::Integer(i) => {
+                        let i128_val: i128 = i.clone().into();
+                        i128_val.to_string()
+                    },
+                    other => {
+                        let encoded = {
+                            let mut buf = Vec::new();
+                            ciborium::ser::into_writer(&other, &mut buf)
+                                .expect("Failed to serialize CBOR map key");
+                            buf
+                        };
+                        let hex_str = hex::encode(encoded);
                         if with_byte_arrays {
-                            format!("\\x{}", encoded)
+                            format!("\\x{}", hex_str)
                         } else {
-                            encoded
+                            hex_str
                         }
                     }
                 };
-                ordered_map.insert(key, cbor_to_json(v, with_byte_arrays));
+
+                result.insert(key, cbor_to_json(v, with_byte_arrays));
             }
-            JsonValue::Object(ordered_map)
+
+            JsonValue::Object(result)
         }
+
         CborValue::Tag(tag, boxed) => {
-            let encoded = hex::encode(serde_cbor::to_vec(&CborValue::Tag(tag, boxed)).unwrap());
+            let mut buf = Vec::new();
+            ciborium::ser::into_writer(&CborValue::Tag(tag, boxed), &mut buf)
+                .expect("Failed to serialize CBOR Tag");
+
+            let hex_str = hex::encode(buf);
             JsonValue::String(if with_byte_arrays {
-                format!("\\x{}", encoded)
+                format!("\\x{}", hex_str)
             } else {
-                encoded
+                hex_str
             })
         }
-        _ => unreachable!(),
+        _ => panic!("Unknown CBOR value"),
     }
 }
 
-pub fn cbor_to_json_ext(value: &CborValueTagged) -> JsonValue {
-    fn to_node(cbor: &CborValueTagged, tag: Option<u64>) -> JsonValue {
+pub fn cbor_to_json_ext(value: &CborValue) -> JsonValue {
+    fn to_node(cbor: &CborValue, tag: Option<u64>) -> JsonValue {
         match cbor {
-            CborValueTagged::Tag(tag_val, inner) => {
+            CborValue::Tag(tag_val, inner) => {
                 let mut result = to_node(inner, None);
 
                 if let JsonValue::Object(ref mut obj) = result {
@@ -126,19 +169,19 @@ pub fn cbor_to_json_ext(value: &CborValueTagged) -> JsonValue {
                 result
             },
 
-            CborValueTagged::Null => json!({
+            CborValue::Null => json!({
                 "type": "null",
                 "value": null,
                 "tag": tag
             }),
 
-            CborValueTagged::Bool(b) => json!({
+            CborValue::Bool(b) => json!({
                 "type": "bool",
                 "value": b,
                 "tag": tag
             }),
 
-            CborValueTagged::Integer(i) => {
+            CborValue::Integer(i) => {
                 let int_val = i128::from(i.clone());
                 json!({
                     "type": "int",
@@ -147,13 +190,13 @@ pub fn cbor_to_json_ext(value: &CborValueTagged) -> JsonValue {
                 })
             }
 
-            CborValueTagged::Float(f) => json!({
+            CborValue::Float(f) => json!({
                 "type": "float",
                 "value": f,
                 "tag": tag
             }),
 
-            CborValueTagged::Text(t) => {
+            CborValue::Text(t) => {
                 let mut clean = String::new();
                 let mut nulls = Vec::new();
 
@@ -178,13 +221,13 @@ pub fn cbor_to_json_ext(value: &CborValueTagged) -> JsonValue {
                 base
             }
 
-            CborValueTagged::Bytes(b) => json!({
+            CborValue::Bytes(b) => json!({
                 "type": "bytes",
                 "value": hex::encode(b),
                 "tag": tag
             }),
 
-            CborValueTagged::Array(arr) => {
+            CborValue::Array(arr) => {
                 let inner = arr.iter().map(|v| to_node(v, None)).collect::<Vec<_>>();
                 json!({
                     "type": "array",
@@ -193,7 +236,7 @@ pub fn cbor_to_json_ext(value: &CborValueTagged) -> JsonValue {
                 })
             }
 
-            CborValueTagged::Map(entries) => {
+            CborValue::Map(entries) => {
                 let mapped = entries
                     .iter()
                     .map(|(k, v)| {
@@ -209,7 +252,7 @@ pub fn cbor_to_json_ext(value: &CborValueTagged) -> JsonValue {
                     "value": mapped,
                     "tag": tag
                 })
-            }
+            },
 
             _ => json!({
                 "type": "unsupported",
@@ -222,7 +265,7 @@ pub fn cbor_to_json_ext(value: &CborValueTagged) -> JsonValue {
     to_node(value, None)
 }
 
-pub fn json_to_cbor_ext(json: &JsonValue) -> CborValueTagged {
+pub fn json_to_cbor_ext(json: &JsonValue) -> CborValue {
     fn restore_string_with_nulls(base: &str, nulls: Option<&Vec<usize>>) -> String {
         if let Some(null_positions) = nulls {
             let mut chars: Vec<char> = base.chars().collect();
@@ -240,26 +283,26 @@ pub fn json_to_cbor_ext(json: &JsonValue) -> CborValueTagged {
         }
     }
 
-    fn parse_node(json: &JsonValue) -> CborValueTagged {
+    fn parse_node(json: &JsonValue) -> CborValue {
         let typ = json.get("type").and_then(|t| t.as_str());
         let tag_val = json.get("tag").and_then(|v| v.as_u64());
 
         let value = match typ {
-            Some("null") => CborValueTagged::Null,
+            Some("null") => CborValue::Null,
 
             Some("bool") => {
                 let b = json.get("value").and_then(|v| v.as_bool()).unwrap_or(false);
-                CborValueTagged::Bool(b)
+                CborValue::Bool(b)
             }
 
             Some("int") => {
                 let n = json.get("value").and_then(|v| v.as_i64()).unwrap_or(0);
-                CborValueTagged::Integer(n.into())
+                CborValue::Integer(n.into())
             }
 
             Some("float") => {
                 let f = json.get("value").and_then(|v| v.as_f64()).unwrap_or(0.0);
-                CborValueTagged::Float(f)
+                CborValue::Float(f)
             }
 
             Some("string") => {
@@ -272,13 +315,13 @@ pub fn json_to_cbor_ext(json: &JsonValue) -> CborValueTagged {
                     })
                 });
                 let restored = restore_string_with_nulls(base, nulls.as_ref());
-                CborValueTagged::Text(restored)
+                CborValue::Text(restored)
             }
 
             Some("bytes") => {
                 let hex_str = json.get("value").and_then(|v| v.as_str()).unwrap_or("");
                 let bytes = hex::decode(hex_str).unwrap_or_default();
-                CborValueTagged::Bytes(bytes)
+                CborValue::Bytes(bytes)
             }
 
             Some("array") => {
@@ -286,7 +329,7 @@ pub fn json_to_cbor_ext(json: &JsonValue) -> CborValueTagged {
                     Some(items) => items.iter().map(parse_node).collect(),
                     None => Vec::new(),
                 };
-                CborValueTagged::Array(inner)
+                CborValue::Array(inner)
             }
 
             Some("map") => {
@@ -298,15 +341,15 @@ pub fn json_to_cbor_ext(json: &JsonValue) -> CborValueTagged {
                     }).collect(),
                     None => Vec::new(),
                 };
-                CborValueTagged::Map(mapped)
+                CborValue::Map(mapped)
             }
 
-            _ => CborValueTagged::Null,
+            _ => CborValue::Null,
         };
 
 
         match tag_val {
-            Some(tag) => CborValueTagged::Tag(tag, Box::new(value)),
+            Some(tag) => CborValue::Tag(tag, Box::new(value)),
             None => value,
         }
     }
