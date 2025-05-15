@@ -63,7 +63,7 @@ mod tests {
             ]
         }));
 
-        let expected_output = hex::decode("a3636164616b697320616d617a696e67216866656174757265738267736369656e636568617070726f6163686776657273696f6ef93c00")
+        let expected_output = hex::decode("a3636164616b697320616d617a696e67216776657273696f6ef93c006866656174757265738267736369656e636568617070726f616368")
             .expect("Failed to decode hex");
         let result = crate::cardano::cbor_encode_jsonb(original_json);
 
@@ -82,7 +82,7 @@ mod tests {
             "hex": "\\x6648d73a09b282c120c8476789f8232b7eead94ff560917ae8fc4eb1"
         }));
 
-        let expected_output = hex::decode("a4636164616b697320616d617a696e67216866656174757265738267736369656e636568617070726f61636863686578581c6648d73a09b282c120c8476789f8232b7eead94ff560917ae8fc4eb16776657273696f6ef93c00")
+        let expected_output = hex::decode("a4636164616b697320616d617a696e67216776657273696f6ef93c006866656174757265738267736369656e636568617070726f61636863686578581c6648d73a09b282c120c8476789f8232b7eead94ff560917ae8fc4eb1")
             .expect("Failed to decode hex");
         let result = crate::cardano::cbor_encode_jsonb(original_json);
 
@@ -101,7 +101,7 @@ mod tests {
             "hex": "\\x6648d73a09b282c120c8476789f8232b7eead94ff560917ae8fc4eb1"
         }));
 
-        let cbor_bytes = hex::decode("a4636164616b697320616d617a696e672163686578581c6648d73a09b282c120c8476789f8232b7eead94ff560917ae8fc4eb16776657273696f6ef93c006866656174757265738267736369656e636568617070726f616368")
+        let cbor_bytes = hex::decode("a4636164616b697320616d617a696e67216776657273696f6ef93c006866656174757265738267736369656e636568617070726f61636863686578581c6648d73a09b282c120c8476789f8232b7eead94ff560917ae8fc4eb1")
             .expect("Failed to decode hex");
         let result = crate::cardano::cbor_decode_jsonb_hex2bytea(&cbor_bytes);
 
@@ -124,7 +124,7 @@ mod tests {
             "hex": "6648d73a09b282c120c8476789f8232b7eead94ff560917ae8fc4eb1"
         }));
 
-        let cbor_bytes = hex::decode("a4636164616b697320616d617a696e672163686578581c6648d73a09b282c120c8476789f8232b7eead94ff560917ae8fc4eb16776657273696f6ef93c006866656174757265738267736369656e636568617070726f616368")
+        let cbor_bytes = hex::decode("a4636164616b697320616d617a696e67216776657273696f6ef93c006866656174757265738267736369656e636568617070726f61636863686578581c6648d73a09b282c120c8476789f8232b7eead94ff560917ae8fc4eb1")
             .expect("Failed to decode hex");
         let result = crate::cardano::cbor_decode_jsonb(&cbor_bytes);
 
@@ -138,62 +138,51 @@ mod tests {
     #[pg_test]
     fn test_cbor_dec_to_jsonb_extended() {
         let original_json = pgrx::JsonB(serde_json::json!({
-              "tag": null,
               "type": "map",
               "value": [
                 {
                   "key": {
-                    "tag": null,
                     "type": "string",
                     "value": "ada"
                   },
-                  "value": {
-                    "tag": null,
+                  "val": {
                     "type": "string",
                     "value": "is amazing!"
                   }
                 },
                 {
                   "key": {
-                    "tag": null,
                     "type": "string",
                     "value": "hex"
                   },
-                  "value": {
-                    "tag": null,
+                  "val": {
                     "type": "bytes",
                     "value": "6648d73a09b282c120c8476789f8232b7eead94ff560917ae8fc4eb1"
                   }
                 },
                 {
                   "key": {
-                    "tag": null,
                     "type": "string",
                     "value": "version"
                   },
-                  "value": {
-                    "tag": null,
+                  "val": {
                     "type": "float",
-                    "value": 1.0
+                    "value": "1"
                   }
                 },
                 {
                   "key": {
-                    "tag": null,
                     "type": "string",
                     "value": "features"
                   },
-                  "value": {
-                    "tag": null,
+                  "val": {
                     "type": "array",
                     "value": [
                       {
-                        "tag": null,
                         "type": "string",
                         "value": "science"
                       },
                       {
-                        "tag": null,
                         "type": "string",
                         "value": "approach"
                       }
@@ -237,41 +226,36 @@ mod tests {
     #[pg_test]
     fn test_cbor_dec_to_jsonb_extended_with_null_symbol() {
         let original_json = pgrx::JsonB(serde_json::json!({
-              "tag": null,
-              "type": "map",
-              "value": [
-                {
-                  "key": {
-                    "tag": null,
-                    "type": "string",
-                    "value": "a"
-                  },
-                  "value": {
-                    "tag": null,
-                    "type": "int",
-                    "value": 1
-                  }
-                },
-                {
-                  "key": {
-                    "tag": null,
-                    "type": "string",
-                    "nulls": [
-                      1
-                    ],
-                    "value": "b"
-                  },
-                  "value": {
-                    "tag": null,
-                    "type": "string",
-                    "nulls": [
-                      2
-                    ],
-                    "value": "cd"
-                  }
-                }
-              ]
-            }));
+          "type": "map",
+          "value": [
+            {
+              "key": {
+                "type": "string",
+                "value": "a"
+              },
+              "val": {
+                "type": "int",
+                "value": "1"
+              }
+            },
+            {
+              "key": {
+                "type": "string",
+                "value": "b",
+                "nulls": [
+                  1
+                ]
+              },
+              "val": {
+                "type": "string",
+                "value": "cd",
+                "nulls": [
+                  2
+                ]
+              }
+            }
+          ]
+        }));
 
         let cbor_bytes = hex::decode("a261610162620063636400")
             .expect("Failed to decode hex");
@@ -288,62 +272,51 @@ mod tests {
     #[pg_test]
     fn test_cbor_enc_jsonb_extended() {
         let original_json = pgrx::JsonB(serde_json::json!({
-              "tag": null,
               "type": "map",
               "value": [
                 {
                   "key": {
-                    "tag": null,
                     "type": "string",
                     "value": "ada"
                   },
-                  "value": {
-                    "tag": null,
+                  "val": {
                     "type": "string",
                     "value": "is amazing!"
                   }
                 },
                 {
                   "key": {
-                    "tag": null,
                     "type": "string",
                     "value": "hex"
                   },
-                  "value": {
-                    "tag": null,
+                  "val": {
                     "type": "bytes",
                     "value": "6648d73a09b282c120c8476789f8232b7eead94ff560917ae8fc4eb1"
                   }
                 },
                 {
                   "key": {
-                    "tag": null,
                     "type": "string",
                     "value": "version"
                   },
-                  "value": {
-                    "tag": null,
+                  "val": {
                     "type": "float",
-                    "value": 1.0
+                    "value": "1"
                   }
                 },
                 {
                   "key": {
-                    "tag": null,
                     "type": "string",
                     "value": "features"
                   },
-                  "value": {
-                    "tag": null,
+                  "val": {
                     "type": "array",
                     "value": [
                       {
-                        "tag": null,
                         "type": "string",
                         "value": "science"
                       },
                       {
-                        "tag": null,
                         "type": "string",
                         "value": "approach"
                       }
@@ -363,37 +336,32 @@ mod tests {
     #[pg_test]
     fn test_cbor_enc_jsonb_extended_with_null_symbol() {
         let original_json = pgrx::JsonB(serde_json::json!({
-              "tag": null,
               "type": "map",
               "value": [
                 {
                   "key": {
-                    "tag": null,
                     "type": "string",
                     "value": "a"
                   },
-                  "value": {
-                    "tag": null,
+                  "val": {
                     "type": "int",
-                    "value": 1
+                    "value": "1"
                   }
                 },
                 {
                   "key": {
-                    "tag": null,
                     "type": "string",
+                    "value": "b",
                     "nulls": [
                       1
-                    ],
-                    "value": "b"
+                    ]
                   },
-                  "value": {
-                    "tag": null,
+                  "val": {
                     "type": "string",
+                    "value": "cd",
                     "nulls": [
                       2
-                    ],
-                    "value": "cd"
+                    ]
                   }
                 }
               ]
