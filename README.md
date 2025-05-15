@@ -1,25 +1,27 @@
 # Contents
 
-1. [About this project](#about-this-project)
-2. [Installing Pre-built Binaries](#installing-pre-built-binaries)
-3. [Building from sources](#building-from-sources)
-    - [0. Requirements](#0-requirements)
-    - [1. Install Rust](#1-install-rust)
-    - [2. Clone the Repository and install dependencies](#2-clone-the-repository-and-install-dependencies)
-    - [3. Test the Extension](#3-test-the-extension-optional)
-    - [4. Build and Install the Extension](#4-build-and-install-the-extension)
-4. [Using the Extension](#using-the-extension)
-    - [Create the Extension in PostgreSQL](#create-the-extension-in-postgresql)
-    - [Examples](#examples)
-      - [Base58 Encoding and Decoding](#base58-encoding-and-decoding)
-      - [Bech32 Encoding and Decoding](#bech32-encoding-and-decoding)
-      - [CBOR Encoding and Decoding](#cbor-encoding-and-decoding)
-      - [Blake2b Hashing](#blake2b-hashing)
-      - [Ed25519 Signing and Verification](#ed25519-signing-and-verification)
-      - [dRep View ID Builders](#drep-view-id-builders)
-      - [Asset Name Conversion](#asset-name-conversion)
-      - [Shelley Address Utilities](#shelley-address-utilities)
-      - [CIP-88](#cip-88)
+* [Contents](#contents)
+  * [About this project](#about-this-project)
+* [Installing Pre-built Binaries](#installing-pre-built-binaries)
+* [Building from sources](#building-from-sources)
+  * [0. Requirements](#0-requirements)
+  * [1. Install Rust](#1-install-rust)
+  * [2. Clone the Repository and install dependencies](#2-clone-the-repository-and-install-dependencies)
+  * [3. Test the Extension (OPTIONAL)](#3-test-the-extension-optional)
+  * [4. Build and Install the Extension](#4-build-and-install-the-extension)
+* [Using the Extension](#using-the-extension)
+  * [Create the Extension in PostgreSQL](#create-the-extension-in-postgresql)
+  * [Examples](#examples)
+    * [Base58 Encoding and Decoding](#base58-encoding-and-decoding)
+    * [Bech32 Encoding and Decoding](#bech32-encoding-and-decoding)
+    * [CBOR Encoding and Decoding (simple)](#cbor-encoding-and-decoding-simple)
+    * [CBOR Encoding and Decoding (extended)](#cbor-encoding-and-decoding-extended)
+    * [Blake2b Hashing](#blake2b-hashing)
+    * [Ed25519 Signing and Verification](#ed25519-signing-and-verification)
+    * [dRep View ID Builders](#drep-view-id-builders)
+    * [Asset Name Conversion](#asset-name-conversion)
+    * [Shelley Address Utilities](#shelley-address-utilities)
+    * [CIP-88](#cip-88)
 
 ## About this project
 
@@ -188,19 +190,18 @@ SELECT cardano.bech32_decode_data('ada1d9ejqctdv9axjmn8dypl4d');
 -- Returns '\x697320616d617a696e67' (hex for 'is amazing')
 ```
 ---
-### **CBOR Encoding and Decoding**
+### **CBOR Encoding and Decoding (simple)**
 
-Encode JSONB data to CBOR format or decode CBOR back to JSONB/JSON.
+Encode JSONB data into CBOR format or decode CBOR back to JSONB.  
+Quick and lightweight encoding/decoding suitable for most basic tasks, but not 100% compatible with CBOR due to JSON limitations.  
+It does not support non-string and non-numeric keys, irreversibly removes null bytes from strings (as PostgreSQL cannot handle them), does not support CBOR tags,  
+and lacks complete support for working with `map`. CBOR decoded and then re-encoded using this method will, in most cases, differ from the original version.
 
-- **Encode JSONB to CBOR:**  
-  Any string containing a hex-encoded data that begins with `\\x` will be encoded as a **_byte array_**. Otherwise, it will be encoded as a string.  
-  >Please note that **_JSONB sorts its fields_** for internal optimizations.
-```sql
-SELECT cardano.cbor_encode_jsonb('{"ada": "is amazing!", "version": 1.0, "bytes": "\\xdeadbeef"}');
--- Returns '\xa3636164616b697320616d617a696e672165627974657344deadbeef6776657273696f6ef93c00'
-```
+However, these functions are sufficient for the majority of tasks related to working with Cardano.
 
-- **Decode CBOR to JSONB:**  
+If you require **full CBOR support** in JSON and the ability to parse/assemble complex structures of any kind, proceed to [CBOR Encoding and Decoding (extended)](#cbor-encoding-and-decoding-extended).
+
+- **Decode CBOR to simple JSONB:**
   If fields contain `bytes` values, they will be represented as plain hex-like strings.   
   >Please note that **_JSONB sorts its fields_** for internal optimizations.
 ```sql
@@ -216,6 +217,74 @@ SELECT cardano.cbor_decode_jsonb_hex2bytea('\xa3636164616b697320616d617a696e6721
 -- Returns '{"ada": "is amazing!", "bytes": "\\xdeadbeef", "version": 1.0}'
 ```
 
+- **Encode JSONB to CBOR:**  
+  Any string containing a hex-encoded data that begins with `\\x` will be encoded as a **_byte array_**. Otherwise, it will be encoded as a string.
+  >Please note that **_JSONB sorts its fields_** for internal optimizations.
+```sql
+SELECT cardano.cbor_encode_jsonb('{"ada": "is amazing!", "version": 1.0, "bytes": "\\xdeadbeef"}');
+-- Returns '\xa3636164616b697320616d617a696e672165627974657344deadbeef6776657273696f6ef93c00'
+```
+
+### **CBOR Encoding and Decoding (extended)**
+
+These methods allow working with the CBOR<->JSON pipeline without **any limitations**. It is based on the following structures:
+
+```typescript
+type Content = {
+    type: "string" | "int" | "float" | "bool" | "bytes" | "array"   | "map"  | "null";
+    data:                    string                     | Content[] | Pair[] |  null;
+    tag?: number;
+    nulls?: number[]; // service field for strings only
+};
+
+type Pair = {
+    key: Content | null;
+    value: Content | null;
+};
+```
+This way, you have the ability to encode/decode virtually anything.
+These methods allow you to accomplish anything — even assemble a transaction byte-by-byte if, for some reason, you need to do so.
+Moreover, they guarantee that CBOR decoded into JSONB and re-encoded back into CBOR will remain unchanged.
+
+Drawbacks:
+1. The resulting JSON has a more complex structure compared to the `simple` version;
+2. Reading "on the fly" becomes slightly more challenging, especially when working with `map`.
+
+However, this is an excellent solution if the primary workflow will be outside of the database. 
+
+- **Decode CBOR to extended JSONB:**  
+  Convert CBOR to an extended JSONB without any limitations, allowing it to handle everything — including `object keys`, `maps`, and `tags`.  
+  It also processes null bytes in strings by cutting them while storing their positions, enabling you to restore the CBOR with all removed characters intact.
+```sql
+SELECT cardano.cbor_decode_jsonb_ext('\xa3636164616b697320616d617a696e672165627974657344deadbeef6776657273696f6ef93c00');  
+-- Returns '
+-- {
+--   "type": "map",
+--   "value": [
+--         {
+--           "key": {"type": "string","value": "ada"},
+--           "val": {"type": "string","value": "is amazing!"}
+--         },
+--         {
+--           "key": {"type": "string","value": "bytes"},
+--           "val": {"type": "bytes","value": "deadbeef"}
+--         },
+--         {
+--           "key": {"type": "string","value": "version"},
+--           "val": {"type": "float","value": "1"}
+--         }
+--   ]
+-- }    
+-- '
+```
+
+
+- **Encode extended JSONB to CBOR:**  
+  This method allows converting extended JSONB to CBOR, including the previously removed null bytes from strings.
+```sql
+SELECT cardano.cbor_encode_jsonb_ext(' {"type": "map", "value": [{"key": {"type": "string", "value": "ada"}, "val": {"type": "string", "value": "is amazing!"}}, {"key": {"type": "string", "value": "bytes"}, "val": {"type": "bytes", "value": "deadbeef"}}, {"key": {"type": "string", "value": "version"}, "val": {"type": "float", "value": "1"}}]}');
+-- Returns '\xa3636164616b697320616d617a696e672165627974657344deadbeef6776657273696f6ef93c00'
+```
 ---
 ### **Blake2b Hashing**
 Hash data using the Blake2b algorithm with a specified output length (between 1 and 64 bytes).
