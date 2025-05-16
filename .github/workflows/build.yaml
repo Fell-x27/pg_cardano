@@ -2,11 +2,11 @@ name: Build, Test and release pg_cardano
 
 on:
   push:
-    branches:
-      - "*"
-  pull_request:
-    branches:
-      - "*"
+    tags:
+      - '*'
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -14,14 +14,16 @@ jobs:
     runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
-        os: [linux_amd64, macos_amd64]
+        os: [linux_amd64, macos_amd64, linux_arm64, macos_arm64]
         include:
           - os: linux_amd64
             runner: ubuntu-latest
           - os: macos_amd64
+            runner: macos-13
+          - os: linux_arm64
+            runner: ubuntu-24.04-arm
+          - os: macos_arm64
             runner: macos-latest
-    container:
-      image: ${{ matrix.image }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -37,6 +39,14 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
 
+      - name: Cache PGRX build
+        uses: actions/cache@v4
+        with:
+          path: ~/.pgrx
+          key: ${{ runner.os }}-pgrx-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pgrx-
+
       - name: Install dependencies
         run: |
           case "${{ matrix.os }}" in
@@ -44,19 +54,25 @@ jobs:
               sudo apt update && sudo apt install -y postgresql libclang-dev clang curl build-essential libreadline-dev zlib1g-dev flex bison libxml2-dev libxslt-dev libssl-dev libxml2-utils xsltproc ccache pkg-config
               ;;
             macos*)
-              brew install bash postgresql llvm curl readline bison flex zlib openssl ccache icu4c pkg-config gettext libiconv
-              brew link icu4c --force
-              export LDFLAGS="-L$(brew --prefix icu4c)/lib"
-              export CPPFLAGS="-I$(brew --prefix icu4c)/include"
-              export PKG_CONFIG_PATH="$(brew --prefix)/opt/icu4c/lib/pkgconfig"
-              export CMAKE_PREFIX_PATH=/usr/local/opt/icu4c
-              ;;
+             brew install icu4c
+             brew link --force icu4c
+             brew install bash postgresql llvm curl readline bison flex zlib openssl ccache pkg-config gettext libiconv
+          
+             export LDFLAGS="-L$(brew --prefix icu4c)/lib"
+             export CPPFLAGS="-I$(brew --prefix icu4c)/include"
+             export PKG_CONFIG_PATH="$(brew --prefix icu4c)/lib/pkgconfig"
+          
+             echo "LDFLAGS=$LDFLAGS" >> $GITHUB_ENV
+             echo "CPPFLAGS=$CPPFLAGS" >> $GITHUB_ENV
+             echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH" >> $GITHUB_ENV
+             ;;
           esac
 
-      - name: Install Rust
-        run: |
-          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-          echo "PATH=$HOME/.cargo/bin:$PATH" >> $GITHUB_ENV
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
 
       - name: Install specific cargo-pgrx
         run: |
@@ -75,7 +91,7 @@ jobs:
         run: |
           cargo test --package pg_cardano --lib tests
           ./scripts/install.sh
-          ./scripts/uninstall.sh
+          ./scripts/uninstall.sh          
 
       - name: Extract version from Cargo.toml
         id: get_version
@@ -84,38 +100,70 @@ jobs:
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
+      - name: Prepare release
+        run: |
+          chmod +x ./scripts/release.sh
+          RELEASE_NAME="pg_cardano_v${{ env.VERSION }}_${{ matrix.os }}.tar.gz"
+          /opt/homebrew/bin/bash ./scripts/release.sh $RELEASE_NAME || bash ./scripts/release.sh $RELEASE_NAME
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: pg_cardano_v${{ env.VERSION }}_${{ matrix.os }}
-          path: ./pg_cardano
+          path: ./releases
           if-no-files-found: error
           retention-days: 90
-          compression-level: 0
+          compression-level: 6
 
   release:
     name: Create GitHub Release
     needs: build
-    if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Debug info
+        run: |
+          echo "EVENT_NAME = $GITHUB_EVENT_NAME"
+          echo "REF        = $GITHUB_REF"
+
+      - name: Extract version from Cargo.toml
+        id: get_version
+        run: |
+          VERSION=$(grep '^version' Cargo.toml | head -n 1 | cut -d '"' -f 2)
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
           path: ./artifacts
 
-      - name: Extract version from tag
-        id: extract_tag
+      - name: Ensure release notes exist
         run: |
-          VERSION=${GITHUB_REF#refs/tags/}
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          NOTE="./release_notes/v${VERSION}.md"
+          if [ ! -f "$NOTE" ]; then
+            echo "::error file=$NOTE::Relise notes not found"
+            exit 1
+          fi
 
-      - name: Publish GitHub Release
+      - name: Read release title
+        id: release_title
+        run: |
+          TITLE=$(head -n 1 ./release_notes/v${VERSION}.md | sed 's/^# //')
+          echo "release_title=$TITLE" >> $GITHUB_OUTPUT
+
+      - name: Strip title from release notes
+        run: |
+          tail -n +2 ./release_notes/v${VERSION}.md > ./release_notes/v${VERSION}_body.md
+
+      - name: Draft GitHub Release
         uses: softprops/action-gh-release@v1
         with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag_name: ${{ github.ref_name }}
+          name: ${{ steps.release_title.outputs.release_title }}
           draft: true
-          body_path: ./release_notes/${{ steps.extract_tag.outputs.version }}.md
+          body_path: ./release_notes/v${{ env.VERSION }}_body.md
           files: ./artifacts/**

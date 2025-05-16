@@ -57,7 +57,13 @@ if [ ! -d "$DISTRO_DIR" ]; then
   exit 1
 fi
 
-ARCHIVE_NAME="${PACKAGE_NAME}_linux_x64_v${PACKAGE_VERSION}.tar.gz"
+# Determine archive name: use first argument if provided, otherwise default
+if [ $# -ge 1 ]; then
+  ARCHIVE_NAME="$1"
+else
+  ARCHIVE_NAME="${PACKAGE_NAME}_linux_x64_v${PACKAGE_VERSION}.tar.gz"
+fi
+
 tar -czf "$DIR/$ARCHIVE_NAME" -C "$DIR/.." "$(basename "$DISTRO_DIR")"
 
 RELEASES_DIR="$DIR/../releases"
