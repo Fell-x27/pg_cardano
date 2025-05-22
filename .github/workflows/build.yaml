@@ -164,6 +164,6 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           tag_name: ${{ github.ref_name }}
           name: ${{ steps.release_title.outputs.release_title }}
-          draft: true
+          draft: false
           body_path: ./release_notes/v${{ env.VERSION }}_body.md
           files: ./artifacts/**

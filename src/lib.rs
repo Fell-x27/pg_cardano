@@ -6,11 +6,11 @@ use hex;
 use pgrx::prelude::*;
 use pgrx::*;
 
-use serde_json::{Value as JsonValue};
+use serde_json::Value as JsonValue;
 
-use ciborium::value::{Value as CborValue};
 use ciborium::de::from_reader;
 use ciborium::ser::into_writer;
+use ciborium::value::Value as CborValue;
 
 use std::io::Cursor;
 
@@ -24,7 +24,6 @@ pg_module_magic!();
 
 #[pg_schema]
 mod cardano {
-
     use super::*;
     //Base58
     #[pg_extern]
@@ -75,7 +74,7 @@ mod cardano {
         cbor_bytes: &[u8],
     ) -> JsonB {
         let cbor: CborValue = from_reader(Cursor::new(cbor_bytes)).expect("Failed to decode CBOR");
-        JsonB(cbor_to_json(cbor, false))
+        JsonB(cbor_to_json(&cbor, false))
     }
 
     #[pg_extern]
@@ -83,7 +82,7 @@ mod cardano {
         cbor_bytes: &[u8],
     ) -> JsonB {
         let cbor: CborValue = from_reader(Cursor::new(cbor_bytes)).expect("Failed to decode CBOR");
-        JsonB(cbor_to_json(cbor, true))
+        JsonB(cbor_to_json(&cbor, true))
     }
 
     #[pg_extern]
