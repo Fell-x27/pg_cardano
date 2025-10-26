@@ -11,13 +11,13 @@ name = "pgrx_embed_pg_cardano"
 path = "./src/bin/pgrx_embed.rs"
 
 [features]
-default = ["pg12"]
-pg12 = ["pgrx/pg12", "pgrx-tests/pg12" ]
+default = ["pg17"]
 pg13 = ["pgrx/pg13", "pgrx-tests/pg13" ]
 pg14 = ["pgrx/pg14", "pgrx-tests/pg14" ]
 pg15 = ["pgrx/pg15", "pgrx-tests/pg15" ]
 pg16 = ["pgrx/pg16", "pgrx-tests/pg16" ]
 pg17 = ["pgrx/pg17", "pgrx-tests/pg17" ]
+pg18 = ["pgrx/pg18", "pgrx-tests/pg18" ]
 pg_test = []
 
 [dependencies]
@@ -27,12 +27,12 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = {version = "1.0", features = ["preserve_order"] }
 blake2 = "0.10"
 ed25519-dalek = "2.1"
-pgrx = { version = "0.12"}
+pgrx = { version = "0.16.1"}
 hex = "0.4.3"
 ciborium = "0.2.2"
 
 [dev-dependencies]
-pgrx-tests = "=0.12"
+pgrx-tests = "=0.16.1"
 
 [profile.dev]
 panic = "unwind"
@@ -42,3 +42,4 @@ panic = "unwind"
 opt-level = 3
 lto = "fat"
 codegen-units = 1
+
