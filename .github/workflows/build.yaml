@@ -76,11 +76,11 @@ jobs:
 
       - name: Install specific cargo-pgrx
         run: |
-          cargo install --version 0.12.9 cargo-pgrx
+          cargo install --locked --version 0.17.0 cargo-pgrx
 
       - name: Initialize cargo-pgrx
         run: |
-          cargo pgrx init
+          cargo pgrx init --pg15 download --pg16 download --pg17 download --pg18 download
 
       - name: Build distribution
         run: |
