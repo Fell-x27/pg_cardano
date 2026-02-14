@@ -87,11 +87,10 @@ jobs:
           chmod +x ./scripts/build.sh
           /opt/homebrew/bin/bash ./scripts/build.sh || bash ./scripts/build.sh
 
-      - name: Run tests
+      - name: Run compatibility tests (pg15..pg18)
         run: |
-          cargo test --package pg_cardano --lib tests
-          ./scripts/install.sh
-          ./scripts/uninstall.sh          
+          export TERM=xterm
+          cargo pgrx test all --no-default-features
 
       - name: Extract version from Cargo.toml
         id: get_version
