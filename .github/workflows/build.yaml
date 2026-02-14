@@ -19,11 +19,11 @@ jobs:
           - os: linux_amd64
             runner: ubuntu-latest
           - os: macos_amd64
-            runner: macos-13
+            runner: macos-15-intel
           - os: linux_arm64
             runner: ubuntu-24.04-arm
           - os: macos_arm64
-            runner: macos-latest
+            runner: macos-15
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
