@@ -1,4 +1,6 @@
 #!/bin/bash
+# Creates a release archive from the built pg_cardano distribution directory.
+# Reads package metadata from Cargo.toml and writes the tar.gz into releases/.
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 

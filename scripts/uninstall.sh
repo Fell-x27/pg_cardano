@@ -1,4 +1,6 @@
 #!/bin/bash
+# Uninstalls pg_cardano files from PostgreSQL system directories for the detected version.
+# Removes extension SQL/control files and shared library artifacts using sudo.
 
 BOLD=$(tput bold)
 RESET=$(tput sgr0)

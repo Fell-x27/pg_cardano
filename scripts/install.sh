@@ -1,4 +1,6 @@
 #!/bin/bash
+# Installs prebuilt pg_cardano extension files for the detected PostgreSQL version.
+# Copies SQL/control files and shared libraries into PostgreSQL system directories using sudo.
 
 
 BOLD=$(tput bold)

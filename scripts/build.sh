@@ -1,4 +1,6 @@
 #!/bin/bash
+# Builds distribution artifacts only for PostgreSQL versions present in both:
+# ~/.pgrx/config.toml and the crate's pgXX features in Cargo.toml.
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG_FILE="$HOME/.pgrx/config.toml"
@@ -36,6 +38,38 @@ while IFS='=' read -r key value; do
   fi
 done < "$CARGO_TOML"
 
+SUPPORTED_PG_FEATURES=()
+in_features=false
+
+while IFS='=' read -r key _; do
+  key=$(echo "$key" | xargs)
+  if [[ "$key" == "[features]" ]]; then
+    in_features=true
+    continue
+  fi
+  if $in_features && [[ "$key" == "["* ]] && [[ "$key" != "[features]" ]]; then
+    in_features=false
+  fi
+  if $in_features && [[ "$key" =~ ^pg[0-9]+$ ]]; then
+    SUPPORTED_PG_FEATURES+=("$key")
+  fi
+done < "$CARGO_TOML"
+
+if [ ${#SUPPORTED_PG_FEATURES[@]} -eq 0 ]; then
+  echo "No pgXX features found in [features] section of $CARGO_TOML"
+  exit 1
+fi
+
+is_supported_pg_feature() {
+  local feature="$1"
+  for supported in "${SUPPORTED_PG_FEATURES[@]}"; do
+    if [[ "$supported" == "$feature" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
 PG_CONFIG_KEYS=()
 PG_CONFIG_PATHS=()
 in_configs=false
@@ -57,6 +91,8 @@ if [ ${#PG_CONFIG_KEYS[@]} -eq 0 ]; then
   echo "No PostgreSQL versions found in $CONFIG_FILE"
   exit 1
 fi
+
+echo "Supported PostgreSQL features in Cargo.toml: ${SUPPORTED_PG_FEATURES[*]}"
 
 DISTR_DIR="$DIR/../pg_cardano"
 BIN_DIR="$DISTR_DIR/bin"
@@ -82,9 +118,16 @@ if [[ "$latest_suffix" != "$PACKAGE_VERSION" && ! -f "$expected_file" ]]; then
   touch "$expected_file"
 fi
 
+matched_pg_features=0
 for i in "${!PG_CONFIG_KEYS[@]}"; do
   PG_KEY="${PG_CONFIG_KEYS[$i]}"
   PG_CONFIG="${PG_CONFIG_PATHS[$i]}"
+
+  if ! is_supported_pg_feature "$PG_KEY"; then
+    echo "Skipping $PG_KEY from $CONFIG_FILE: feature not declared in Cargo.toml"
+    continue
+  fi
+  matched_pg_features=$((matched_pg_features + 1))
 
   if [ -f "$PG_CONFIG" ]; then
     PG_VER_NUM=$("$PG_CONFIG" --version | awk '{print $2}' | cut -d. -f1)
@@ -112,9 +155,13 @@ for i in "${!PG_CONFIG_KEYS[@]}"; do
   fi
 done
 
+if [ "$matched_pg_features" -eq 0 ]; then
+  echo "No matching pgXX versions between Cargo.toml [features] and $CONFIG_FILE"
+  exit 1
+fi
+
 cp "$DIR/install.sh" "$DISTR_DIR/" 2>/dev/null || true
 cp "$DIR/uninstall.sh" "$DISTR_DIR/" 2>/dev/null || true
 cp "$OUTER_SQL_DIR"/*.sql "$MIGRATIONS_DIR/" 2>/dev/null || true
 
 echo "Packaging completed."
-

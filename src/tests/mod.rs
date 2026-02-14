@@ -6,6 +6,12 @@ mod tests {
     use hex;
     use pgrx::prelude::*;
 
+    fn spi_get_bool(query: &str) -> bool {
+        Spi::get_one::<bool>(query)
+            .expect("SPI query failed")
+            .expect("SPI query returned NULL")
+    }
+
     #[pg_test]
     fn test_base58_enc() {
         let input = b"Cardano";
@@ -103,7 +109,7 @@ mod tests {
 
         let cbor_bytes = hex::decode("a4636164616b697320616d617a696e67216776657273696f6ef93c006866656174757265738267736369656e636568617070726f61636863686578581c6648d73a09b282c120c8476789f8232b7eead94ff560917ae8fc4eb1")
             .expect("Failed to decode hex");
-        let result = crate::cardano::cbor_decode_jsonb_hex2bytea(&cbor_bytes);
+        let result = crate::cardano::cbor_decode_jsonb_hex2bytea(&cbor_bytes, true);
 
         let expected_output =
             serde_json::to_string(&original_json.0).expect("Failed to serialize original_json");
@@ -126,7 +132,7 @@ mod tests {
 
         let cbor_bytes = hex::decode("a4636164616b697320616d617a696e67216776657273696f6ef93c006866656174757265738267736369656e636568617070726f61636863686578581c6648d73a09b282c120c8476789f8232b7eead94ff560917ae8fc4eb1")
             .expect("Failed to decode hex");
-        let result = crate::cardano::cbor_decode_jsonb(&cbor_bytes);
+        let result = crate::cardano::cbor_decode_jsonb(&cbor_bytes, true);
 
         let expected_output =
             serde_json::to_string(&original_json.0).expect("Failed to serialize original_json");
@@ -614,5 +620,77 @@ mod tests {
 
         let result = crate::cardano::tools_verify_cip88_pool_key_registration(&cbor_data);
         assert!(!result, "Expected is_valid to be false, but got true");
+    }
+
+    #[pg_test]
+    fn test_pg_proc_flags_for_cardano_functions() {
+        let signatures = [
+            "cardano.base58_encode(bytea)",
+            "cardano.base58_decode(text)",
+            "cardano.bech32_encode(text,bytea)",
+            "cardano.bech32_decode_prefix(text)",
+            "cardano.bech32_decode_data(text)",
+            "cardano.cbor_encode_jsonb(jsonb)",
+            "cardano.cbor_decode_jsonb(bytea)",
+            "cardano.cbor_decode_jsonb(bytea,boolean)",
+            "cardano.cbor_decode_jsonb_hex2bytea(bytea)",
+            "cardano.cbor_decode_jsonb_hex2bytea(bytea,boolean)",
+            "cardano.cbor_decode_jsonb_ext(bytea)",
+            "cardano.cbor_encode_jsonb_ext(jsonb)",
+            "cardano.blake2b_hash(bytea,integer)",
+            "cardano.ed25519_sign_message(bytea,bytea)",
+            "cardano.ed25519_verify_signature(bytea,bytea,bytea)",
+            "cardano.tools_drep_id_encode_cip105(bytea,boolean)",
+            "cardano.tools_drep_id_encode_cip129(bytea,boolean)",
+            "cardano.tools_read_asset_name(bytea)",
+            "cardano.tools_shelley_address_build(bytea,boolean,bytea,boolean,integer)",
+            "cardano.tools_shelley_addr_extract_payment_cred(text)",
+            "cardano.tools_shelley_addr_extract_stake_cred(text)",
+            "cardano.tools_shelley_addr_get_type(text)",
+            "cardano.tools_verify_cip88_pool_key_registration(bytea)",
+        ];
+
+        for signature in signatures {
+            let query = format!(
+                "SELECT (p.provolatile = 'i') AND p.proisstrict AND (p.proparallel = 's') \
+                 FROM pg_catalog.pg_proc p \
+                 WHERE p.oid = '{}'::pg_catalog.regprocedure",
+                signature
+            );
+            assert!(
+                spi_get_bool(&query),
+                "Expected immutable+strict+parallel_safe for {}",
+                signature
+            );
+        }
+    }
+
+    #[pg_test]
+    fn test_strict_null_propagation_in_sql() {
+        assert!(spi_get_bool("SELECT cardano.base58_encode(NULL::bytea) IS NULL"));
+        assert!(spi_get_bool("SELECT cardano.cbor_decode_jsonb(NULL::bytea) IS NULL"));
+        assert!(spi_get_bool(
+            "SELECT cardano.cbor_decode_jsonb('\\x80'::bytea, NULL::boolean) IS NULL"
+        ));
+        assert!(spi_get_bool("SELECT cardano.blake2b_hash(NULL::bytea, 32) IS NULL"));
+        assert!(spi_get_bool(
+            "SELECT cardano.tools_verify_cip88_pool_key_registration(NULL::bytea) IS NULL"
+        ));
+    }
+
+    #[pg_test]
+    fn test_cbor_default_overloads_match_aggressive_true() {
+        assert!(spi_get_bool(
+            "SELECT cardano.cbor_decode_jsonb('\\x4101'::bytea) = cardano.cbor_decode_jsonb('\\x4101'::bytea, true)"
+        ));
+        assert!(spi_get_bool(
+            "SELECT cardano.cbor_decode_jsonb_hex2bytea('\\x4101'::bytea) = cardano.cbor_decode_jsonb_hex2bytea('\\x4101'::bytea, true)"
+        ));
+        assert!(spi_get_bool(
+            "SELECT cardano.cbor_decode_jsonb('\\x4101'::bytea, false) = to_jsonb('01'::text)"
+        ));
+        assert!(spi_get_bool(
+            "SELECT cardano.cbor_decode_jsonb_hex2bytea('\\x4101'::bytea, false) = to_jsonb('\\x01'::text)"
+        ));
     }
 }

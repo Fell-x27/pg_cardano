@@ -48,53 +48,81 @@ pub fn json_to_cbor(value: &JsonValue) -> CborValue {
     }
 }
 
-pub fn cbor_to_json(value: &CborValue, with_byte_arrays: bool) -> JsonValue {
+fn unfold_nested_cbor(original: CborValue, aggressive: bool) -> CborValue {
+    let mut value = original;
+
+    loop {
+        match &value {
+            CborValue::Tag(24, boxed) => {
+                if let CborValue::Bytes(b) = boxed.as_ref() {
+                    if let Some(decoded) = try_decode_bytes(b) {
+                        value = decoded;
+                        continue;
+                    }
+                }
+                break value;
+            }
+
+            CborValue::Bytes(b) => {
+                if let Some(decoded) = try_decode_bytes(b) {
+                    if aggressive {
+                        value = decoded;
+                        continue;
+                    } else {
+                        match decoded {
+                            CborValue::Map(_)
+                            | CborValue::Array(_)
+                            | CborValue::Tag(_, _)
+                            | CborValue::Text(_) => {
+                                value = decoded;
+                                continue;
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+                break value;
+            }
+
+            _ => break value,
+        }
+    }
+}
+
+fn try_decode_bytes(bytes: &[u8]) -> Option<CborValue> {
+    let mut cursor = std::io::Cursor::new(bytes);
+    if let Ok(parsed) = ciborium::de::from_reader::<CborValue, _>(&mut cursor) {
+        if cursor.position() as usize == bytes.len() {
+            Some(parsed)
+        } else {
+            None
+        }
+    } else {
+        None
+    }
+}
+
+pub fn cbor_to_json(value: &CborValue, with_byte_arrays: bool,  aggressive: bool) -> JsonValue {
+    let value = unfold_nested_cbor(value.clone(), aggressive);
+
     match value {
         CborValue::Null => JsonValue::Null,
 
-        CborValue::Bool(b) => JsonValue::Bool(*b),
+        CborValue::Bool(b) => JsonValue::Bool(b),
 
         CborValue::Integer(i) => {
-            let n: i128 = i.clone().into();
-
+            let n: i128 = i.into();
             match i64::try_from(n) {
-                Ok(as_i64) => JsonValue::Number(serde_json::Number::from(as_i64)),
+                Ok(as_i64) => JsonValue::Number(Number::from(as_i64)),
                 Err(_) => JsonValue::String(n.to_string()),
             }
         }
 
         CborValue::Float(f) => {
-            JsonValue::Number(Number::from_f64(*f).expect("Invalid float"))
+            JsonValue::Number(Number::from_f64(f).expect("Invalid float"))
         }
 
         CborValue::Bytes(b) => {
-            let nested_valid = match ciborium::de::from_reader::<CborValue, _>(b.as_slice()) {
-                Ok(nested_any) => {
-                    let mut cursor = std::io::Cursor::new(b);
-                    if let Ok(parsed) = ciborium::de::from_reader::<CborValue, _>(&mut cursor) {
-                        let fully_consumed = cursor.position() as usize == b.len();
-                        if fully_consumed {
-                            match &parsed {
-                                CborValue::Map(_)
-                                | CborValue::Array(_)
-                                | CborValue::Tag(_, _)
-                                | CborValue::Text(_) => Some(parsed),
-                                _ => None,
-                            }
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    }
-                }
-                Err(_) => None,
-            };
-
-            if let Some(nested) = nested_valid {
-                return cbor_to_json(&nested, with_byte_arrays);
-            }
-
             let hex_str = hex::encode(b);
             JsonValue::String(if with_byte_arrays {
                 format!("\\x{}", hex_str)
@@ -103,20 +131,21 @@ pub fn cbor_to_json(value: &CborValue, with_byte_arrays: bool) -> JsonValue {
             })
         }
 
-        CborValue::Text(t) => {
-            JsonValue::String(t.replace('\u{0}', ""))
-        }
+        CborValue::Text(t) => JsonValue::String(t.replace('\u{0}', "")),
 
         CborValue::Array(arr) => {
-            let items = arr.into_iter()
-                .map(|v| cbor_to_json(v, with_byte_arrays))
+            let items = arr
+                .into_iter()
+                .map(|v| {
+                    let v = unfold_nested_cbor(v, aggressive);
+                    cbor_to_json(&v, with_byte_arrays, aggressive)
+                })
                 .collect();
             JsonValue::Array(items)
         }
 
         CborValue::Map(map) => {
             let mut result = JsonMap::new();
-
             for (k, v) in map {
                 let key = match k {
                     CborValue::Text(t) => t.replace('\u{0}', ""),
@@ -129,17 +158,14 @@ pub fn cbor_to_json(value: &CborValue, with_byte_arrays: bool) -> JsonValue {
                         }
                     }
                     CborValue::Integer(i) => {
-                        let i128_val: i128 = i.clone().into();
+                        let i128_val: i128 = i.into();
                         i128_val.to_string()
-                    },
+                    }
                     other => {
-                        let encoded = {
-                            let mut buf = Vec::new();
-                            ciborium::ser::into_writer(&other, &mut buf)
-                                .expect("Failed to serialize CBOR map key");
-                            buf
-                        };
-                        let hex_str = hex::encode(encoded);
+                        let mut buf = Vec::new();
+                        ciborium::ser::into_writer(&other, &mut buf)
+                            .expect("Failed to serialize CBOR map key");
+                        let hex_str = hex::encode(buf);
                         if with_byte_arrays {
                             format!("\\x{}", hex_str)
                         } else {
@@ -148,7 +174,8 @@ pub fn cbor_to_json(value: &CborValue, with_byte_arrays: bool) -> JsonValue {
                     }
                 };
 
-                result.insert(key, cbor_to_json(v, with_byte_arrays));
+                let v = unfold_nested_cbor(v, aggressive);
+                result.insert(key, cbor_to_json(&v, with_byte_arrays, aggressive));
             }
 
             JsonValue::Object(result)
@@ -156,9 +183,8 @@ pub fn cbor_to_json(value: &CborValue, with_byte_arrays: bool) -> JsonValue {
 
         CborValue::Tag(tag, boxed) => {
             let mut buf = Vec::new();
-            ciborium::ser::into_writer(&CborValue::Tag(*tag, boxed.clone()), &mut buf)
+            ciborium::ser::into_writer(&CborValue::Tag(tag, boxed.clone()), &mut buf)
                 .expect("Failed to serialize CBOR Tag");
-
             let hex_str = hex::encode(buf);
             JsonValue::String(if with_byte_arrays {
                 format!("\\x{}", hex_str)

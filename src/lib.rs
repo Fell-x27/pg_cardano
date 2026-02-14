@@ -26,12 +26,12 @@ pg_module_magic!();
 mod cardano {
     use super::*;
     //Base58
-    #[pg_extern]
+    #[pg_extern(create_or_replace, immutable, strict, parallel_safe)]
     pub(crate) fn base58_encode(input: &[u8]) -> String {
         bs58::encode(input).into_string()
     }
 
-    #[pg_extern]
+    #[pg_extern(create_or_replace, immutable, strict, parallel_safe)]
     pub(crate) fn base58_decode(input: &str) -> Vec<u8> {
         bs58::decode(input)
             .into_vec()
@@ -39,26 +39,26 @@ mod cardano {
     }
 
     // Bech32
-    #[pg_extern]
+    #[pg_extern(create_or_replace, immutable, strict, parallel_safe)]
     pub(crate) fn bech32_encode(hrp: &str, input: &[u8]) -> String {
         let hrp = Hrp::parse(hrp).expect("Failed to parse HRP");
         encode::<Bech32>(hrp, input).expect("Failed to encode Bech32")
     }
 
-    #[pg_extern]
+    #[pg_extern(create_or_replace, immutable, strict, parallel_safe)]
     pub(crate) fn bech32_decode_prefix(bech32_str: &str) -> String {
         let (hrp, _) = decode(bech32_str).expect("Failed to decode Bech32 string");
         hrp.to_string()
     }
 
-    #[pg_extern]
+    #[pg_extern(create_or_replace, immutable, strict, parallel_safe)]
     pub(crate) fn bech32_decode_data(bech32_str: &str) -> Vec<u8> {
         let (_, data) = decode(bech32_str).expect("Failed to decode Bech32 string");
         data
     }
 
     //Cbor
-    #[pg_extern]
+    #[pg_extern(create_or_replace, immutable, strict, parallel_safe)]
     pub(crate) fn cbor_encode_jsonb(input: JsonB) -> Vec<u8> {
         let json: JsonValue = serde_json::from_value(input.0).expect("Failed to parse JsonB");
         let cbor: CborValue = json_to_cbor(&json);
@@ -69,23 +69,33 @@ mod cardano {
     }
 
 
-    #[pg_extern]
+    #[pg_extern(create_or_replace, immutable, strict, parallel_safe)]
     pub(crate) fn cbor_decode_jsonb(
-        cbor_bytes: &[u8],
+        cbor_bytes: &[u8], aggressive: bool
     ) -> JsonB {
         let cbor: CborValue = from_reader(Cursor::new(cbor_bytes)).expect("Failed to decode CBOR");
-        JsonB(cbor_to_json(&cbor, false))
+        JsonB(cbor_to_json(&cbor, false, aggressive))
     }
 
-    #[pg_extern]
+    #[pg_extern(create_or_replace, name = "cbor_decode_jsonb", immutable, strict, parallel_safe)]
+    fn cbor_decode_jsonb_default(cbor_bytes: Vec<u8>) -> JsonB {
+        cbor_decode_jsonb(&cbor_bytes, true)
+    }
+
+    #[pg_extern(create_or_replace, immutable, strict, parallel_safe)]
     pub(crate) fn cbor_decode_jsonb_hex2bytea(
-        cbor_bytes: &[u8],
+        cbor_bytes: &[u8], aggressive: bool
     ) -> JsonB {
         let cbor: CborValue = from_reader(Cursor::new(cbor_bytes)).expect("Failed to decode CBOR");
-        JsonB(cbor_to_json(&cbor, true))
+        JsonB(cbor_to_json(&cbor, true, aggressive))
     }
 
-    #[pg_extern]
+    #[pg_extern(create_or_replace, name = "cbor_decode_jsonb_hex2bytea", immutable, strict, parallel_safe)]
+    fn cbor_decode_jsonb_hex2bytea_default(cbor_bytes: Vec<u8>) -> JsonB {
+        cbor_decode_jsonb_hex2bytea(&cbor_bytes, true)
+    }
+
+    #[pg_extern(create_or_replace, immutable, strict, parallel_safe)]
     pub(crate) fn cbor_decode_jsonb_ext(
         cbor_bytes: &[u8],
     ) -> JsonB {
@@ -93,7 +103,7 @@ mod cardano {
         JsonB(cbor_to_json_ext(&cbor))
     }
 
-    #[pg_extern]
+    #[pg_extern(create_or_replace, immutable, strict, parallel_safe)]
     pub(crate) fn cbor_encode_jsonb_ext(input: JsonB) -> Vec<u8> {
         let json: JsonValue =
             serde_json::from_value(input.0).expect("Failed to parse JsonB");
@@ -105,7 +115,7 @@ mod cardano {
     }
 
     // Blake2B
-    #[pg_extern]
+    #[pg_extern(create_or_replace, immutable, strict, parallel_safe)]
     pub(crate) fn blake2b_hash(input: &[u8], output_length: i32) -> Vec<u8> {
         let output_length = output_length as usize;
         if !(1..=64).contains(&output_length) {
@@ -123,7 +133,7 @@ mod cardano {
     }
 
     // ed25519 sign
-    #[pg_extern]
+    #[pg_extern(create_or_replace, immutable, strict, parallel_safe)]
     pub(crate) fn ed25519_sign_message(secret_key_bytes: &[u8], message: &[u8]) -> Vec<u8> {
         let signing_key = SigningKey::from_bytes(
             &secret_key_bytes
@@ -135,7 +145,7 @@ mod cardano {
     }
 
     // ed25519 verification
-    #[pg_extern]
+    #[pg_extern(create_or_replace, immutable, strict, parallel_safe)]
     pub(crate) fn ed25519_verify_signature(
         public_key_bytes: &[u8],
         message: &[u8],
@@ -153,13 +163,13 @@ mod cardano {
 
     //High-level tools
     // dRep view_id builders
-    #[pg_extern]
+    #[pg_extern(create_or_replace, immutable, strict, parallel_safe)]
     pub(crate) fn tools_drep_id_encode_cip105(raw_id_bytes: &[u8], is_script: bool) -> String {
         let hrp = if is_script { "drep_script" } else { "drep_vkh" };
         bech32_encode(hrp, raw_id_bytes)
     }
 
-    #[pg_extern]
+    #[pg_extern(create_or_replace, immutable, strict, parallel_safe)]
     pub(crate) fn tools_drep_id_encode_cip129(raw_id_bytes: &[u8], is_script: bool) -> String {
         //add 22[0010 0010] for keyhash;
         //add 23[0010 0011] for script;
@@ -174,7 +184,7 @@ mod cardano {
     }
 
     //Asset Name Reader
-    #[pg_extern]
+    #[pg_extern(create_or_replace, immutable, strict, parallel_safe)]
     pub(crate) fn tools_read_asset_name(name: &[u8]) -> String {
         match std::str::from_utf8(name) {
             Ok(utf8_str) => utf8_str.to_string(),
@@ -183,7 +193,7 @@ mod cardano {
     }
 
     // Shelley Addr builder
-    #[pg_extern]
+    #[pg_extern(create_or_replace, immutable, strict, parallel_safe)]
     pub(crate) fn tools_shelley_address_build(
         payment_cred: &[u8],
         p_cred_has_script: bool,
@@ -252,7 +262,7 @@ mod cardano {
     }
 
     // Shelley Addr extractors
-    #[pg_extern]
+    #[pg_extern(create_or_replace, immutable, strict, parallel_safe)]
     pub(crate) fn tools_shelley_addr_extract_payment_cred(shelley_address_bech32: &str) -> Vec<u8> {
         let raw_address = bech32_decode_data(&shelley_address_bech32);
         let addr_type_byte = raw_address[0] >> 4;
@@ -266,7 +276,7 @@ mod cardano {
         }
     }
 
-    #[pg_extern]
+    #[pg_extern(create_or_replace, immutable, strict, parallel_safe)]
     pub(crate) fn tools_shelley_addr_extract_stake_cred(shelley_address_bech32: &str) -> Vec<u8> {
         let raw_address = bech32_decode_data(&shelley_address_bech32);
         let addr_type_byte = raw_address[0] >> 4;
@@ -286,7 +296,7 @@ mod cardano {
     }
 
     // Shelley Addr type detector
-    #[pg_extern]
+    #[pg_extern(create_or_replace, immutable, strict, parallel_safe)]
     pub(crate) fn tools_shelley_addr_get_type(shelley_address_bech32: &str) -> String {
         let raw_address = bech32_decode_data(&shelley_address_bech32);
         let addr_type_byte = raw_address[0] >> 4;
@@ -309,9 +319,9 @@ mod cardano {
 
 
     //cip_88 tools
-    #[pg_extern]
+    #[pg_extern(create_or_replace, immutable, strict, parallel_safe)]
     pub(crate) fn tools_verify_cip88_pool_key_registration(cbor_data: &[u8]) -> bool {
-        let jsonb_data: JsonB = cbor_decode_jsonb_hex2bytea(cbor_data);
+        let jsonb_data: JsonB = cbor_decode_jsonb_hex2bytea(cbor_data, false);
         let json_data = &jsonb_data.0;
 
 
