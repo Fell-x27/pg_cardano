@@ -76,18 +76,18 @@ jobs:
 
       - name: Install specific cargo-pgrx
         run: |
-          cargo install --locked --version 0.17.0 cargo-pgrx
+          cargo install --locked --version 0.20.1 cargo-pgrx
 
       - name: Initialize cargo-pgrx
         run: |
-          cargo pgrx init --pg15 download --pg16 download --pg17 download --pg18 download
+          cargo pgrx init --pg15 download --pg16 download --pg17 download --pg18 download --pg19 download
 
       - name: Build distribution
         run: |
           chmod +x ./scripts/build.sh
           /opt/homebrew/bin/bash ./scripts/build.sh || bash ./scripts/build.sh
 
-      - name: Run compatibility tests (pg15..pg18)
+      - name: Run compatibility tests (pg15..pg19)
         run: |
           export TERM=xterm
           cargo pgrx test all --no-default-features

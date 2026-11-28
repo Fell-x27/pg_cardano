@@ -58,7 +58,7 @@ Then jump to the [Using paragraph](#using-the-extension)!
 To use this extension, you will need the following:
 
 - **Operating System:** Linux (Debian-based or RHEL-based distributions recommended)
-- **PostgreSQL Version:** 12 or higher
+- **PostgreSQL Version:** 15 through 19
 - **Dependencies:**
     - For Debian-based systems:
       ```bash
@@ -84,11 +84,11 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```bash
 git clone https://github.com/cardano-community/pg_cardano.git
 cd pg_cardano
-cargo install cargo-pgrx
+cargo install cargo-pgrx --version 0.20.1 --locked
 cargo pgrx init
 ```
 
-By default, `pgrx` will build environments for PostgreSQL versions 12 through 17. During installation, your database version will be detected automatically. However, the build process can take a long time, so you may want to remove the unnecessary versions from `cargo.toml` and switch the default to the remaining one.
+PostgreSQL 18 is the default Cargo feature. To use an existing PostgreSQL 19 installation, run `cargo pgrx init --pg19 /path/to/pg_config` with the path to its pg_config binary.
 
 Or, you can just leave it as is.
 
